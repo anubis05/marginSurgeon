@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { SeoAuditorAgent } from '@/lib/agents/seoAuditor';
-import { BaseIdentity } from '@/lib/agents/core/types';
+import { SeoAuditorAgent } from '@/agents/seo-auditor/seoAuditor';
+import { BaseIdentity } from '@/agents/types';
 import { Runner, InMemorySessionService } from '@google/adk';
 
 export async function POST(req: Request) {
@@ -43,8 +43,8 @@ export async function POST(req: Request) {
 
         // Drain the generator and capture output text
         for await (const event of stream) {
-            if (event.type === 'agentMessage' && event.message?.role === 'model' && event.message.parts[0]?.text) {
-                finalModelText = event.message.parts[0].text;
+            if ((event as any).type === 'agentMessage' && (event as any).message?.role === 'model' && (event as any).message.parts[0]?.text) {
+                finalModelText = (event as any).message.parts[0].text;
             }
         }
 

@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { BaseIdentity } from "./types";
+import { BaseIdentity } from '@/agents/types';
 
 export class LocatorAgent {
     static async resolve(query: string): Promise<BaseIdentity> {

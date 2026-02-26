@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-import { BaseIdentity, EnrichedProfile } from '@/lib/agents/core/types';
+import { BaseIdentity, EnrichedProfile } from '@/agents/types';
 
 interface MapVisualizerProps {
     lat: number;

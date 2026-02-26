@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ForecasterAgent } from "@/lib/agents/core/forecaster";
+import { ForecasterAgent } from '@/agents/traffic-forecaster/forecaster';
 
 export const maxDuration = 60; // 60 seconds (requires Vercel/Cloud Run config but good practice)
 

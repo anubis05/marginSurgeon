@@ -8,7 +8,7 @@ import ChatInterface from '@/components/Chatbot/ChatInterface';
 import MapVisualizer from '@/components/Chatbot/MapVisualizer';
 import HeatmapGrid from '@/components/Chatbot/HeatmapGrid';
 import { ChatMessage, ForecastResponse } from '@/components/Chatbot/types';
-import { BaseIdentity } from '@/lib/agents/core/types';
+import { BaseIdentity } from '@/agents/types';
 import { NeuralBackground } from '@/components/Chatbot/NeuralBackground';
 import { EmailWall } from '@/components/Chatbot/EmailWall';
 import ResultsDashboard from '@/components/Chatbot/seo/ResultsDashboard';

@@ -1,9 +1,9 @@
 import { SequentialAgent } from "@google/adk";
-import { visionIntakeAgent } from "../visionIntake";
-import { benchmarkerAgent } from "../benchmarker";
-import { commodityWatchdogAgent } from "../commodityWatchdog";
-import { surgeonAgent } from "../surgeon";
-import { advisorAgent } from "../advisor";
+import { visionIntakeAgent } from '@/agents/margin-analyzer/visionIntake';
+import { benchmarkerAgent } from '@/agents/margin-analyzer/benchmarker';
+import { commodityWatchdogAgent } from '@/agents/margin-analyzer/commodityWatchdog';
+import { surgeonAgent } from '@/agents/margin-analyzer/surgeon';
+import { advisorAgent } from '@/agents/margin-analyzer/advisor';
 
 export const marginSurgeryOrchestrator = new SequentialAgent({
     name: 'MarginSurgeryOrchestrator',

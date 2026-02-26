@@ -1,4 +1,4 @@
-import { BaseIdentity, EnrichedProfile } from './types';
+import { BaseIdentity, EnrichedProfile } from '@/agents/types';
 import { chromium } from 'playwright';
 import { FunctionTool, LlmAgent, ParallelAgent } from '@google/adk';
 import { GoogleGenerativeAI } from '@google/generative-ai';

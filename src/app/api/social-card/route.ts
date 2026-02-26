@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSocialCard } from "@/lib/agents/visualizer";
+import { generateSocialCard } from '@/agents/margin-analyzer/visualizer';
 
 export async function POST(req: NextRequest) {
     try {

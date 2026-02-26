@@ -1,6 +1,6 @@
 import { FunctionTool, LlmAgent } from "@google/adk";
 import { z } from "zod";
-import { CompetitorPrice, MenuItem } from "../types";
+import { CompetitorPrice, MenuItem } from '@/lib/types';
 
 // Mock Cache for Zip Codes (in-memory for this MVP)
 const zipCodeCache = new Map<string, CompetitorPrice[]>();

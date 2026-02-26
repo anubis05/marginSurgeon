@@ -41,7 +41,7 @@ const HeatmapGrid: React.FC<HeatmapGridProps> = ({ forecast, onSlotClick, select
                             <span className="font-bold text-slate-200">{day.date.split('-')[2]}</span>
                         </div>
 
-                        {day.slots.map((slot) => {
+                        {day.slots.map((slot: any) => {
                             const isSelected = selectedSlot?.dayStr === day.date && selectedSlot?.slotLabel === slot.label;
                             return (
                                 <button
@@ -61,7 +61,7 @@ const HeatmapGrid: React.FC<HeatmapGridProps> = ({ forecast, onSlotClick, select
                         <div className="col-span-3 pl-4 text-sm text-slate-300 bg-slate-900/50 rounded-r-xl p-2 h-full flex flex-col justify-center border-l-2 border-slate-800">
                             {day.localEvents.length > 0 ? (
                                 <div className="flex flex-col gap-1.5">
-                                    {day.localEvents.slice(0, 3).map((event, idx) => {
+                                    {day.localEvents.slice(0, 3).map((event: any, idx: any) => {
                                         const isSevere = event.toLowerCase().match(/(snow|storm|rain|alert|warning)/);
                                         return (
                                             <span key={idx} className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium whitespace-normal text-left leading-tight ${isSevere ? 'bg-red-900/30 text-red-400 border border-red-800/50 animate-pulse' : 'bg-indigo-900/20 text-indigo-300 border border-indigo-800/30'

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Runner, InMemorySessionService } from "@google/adk";
-import { visionIntakeAgent } from "@/lib/agents/visionIntake";
-import { benchmarkerAgent } from "@/lib/agents/benchmarker";
-import { commodityWatchdogAgent } from "@/lib/agents/commodityWatchdog";
-import { surgeonAgent } from "@/lib/agents/surgeon";
-import { advisorAgent } from "@/lib/agents/advisor";
+import { visionIntakeAgent } from '@/agents/margin-analyzer/visionIntake';
+import { benchmarkerAgent } from '@/agents/margin-analyzer/benchmarker';
+import { commodityWatchdogAgent } from '@/agents/margin-analyzer/commodityWatchdog';
+import { surgeonAgent } from '@/agents/margin-analyzer/surgeon';
+import { advisorAgent } from '@/agents/margin-analyzer/advisor';
 import { MenuItem, MenuAnalysisItem, SurgicalReport } from "@/lib/types";
-import { EnrichedProfile } from "@/lib/agents/core/types";
-import { LocatorAgent } from "@/lib/agents/core/locator";
-import { ProfilerAgent } from "@/lib/agents/core/profiler";
+import { EnrichedProfile } from '@/agents/types';
+import { LocatorAgent } from '@/agents/discovery/locator';
+import { ProfilerAgent } from '@/agents/business-profiler/profiler';
 
 
 export async function POST(req: NextRequest) {

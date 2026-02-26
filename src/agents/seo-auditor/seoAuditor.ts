@@ -29,7 +29,7 @@ export const SeoAuditorAgent = new LlmAgent({
        
        OUTPUT STRICTLY VALID JSON! NO MARKDOWN. NO CODE BLOCKS.`,
     model: 'gemini-2.5-pro',
-    temperature: 0.2,
+    
     tools: [
         new FunctionTool({
             name: 'googleSearch',

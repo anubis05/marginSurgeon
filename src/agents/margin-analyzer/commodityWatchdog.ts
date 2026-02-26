@@ -1,6 +1,6 @@
 import { FunctionTool, LlmAgent } from "@google/adk";
 import { z } from "zod";
-import { CommodityTrend } from "../types";
+import { CommodityTrend } from '@/lib/types';
 
 const CheckCommoditiesTool = new FunctionTool({
     name: 'check_commodity_inflation',

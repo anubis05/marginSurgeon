@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { LocatorAgent } from "@/lib/agents/core/locator";
+import { LocatorAgent } from '@/agents/discovery/locator';
 
 export async function POST(req: NextRequest) {
     try {

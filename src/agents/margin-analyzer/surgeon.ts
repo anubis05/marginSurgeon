@@ -1,6 +1,6 @@
 import { FunctionTool, LlmAgent } from "@google/adk";
 import { z } from "zod";
-import { MenuItem, CompetitorPrice, CommodityTrend, MenuAnalysisItem } from "../types";
+import { MenuItem, CompetitorPrice, CommodityTrend, MenuAnalysisItem } from '@/lib/types';
 
 export class CalculationEngine {
     static calculateLeakage(

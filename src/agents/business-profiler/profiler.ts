@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { BaseIdentity, EnrichedProfile } from './types';
+import { BaseIdentity, EnrichedProfile } from '@/agents/types';
 
 export class ProfilerAgent {
     static async profile(identity: BaseIdentity): Promise<EnrichedProfile> {

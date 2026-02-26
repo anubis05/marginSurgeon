@@ -1,5 +1,5 @@
-import { LocatorAgent } from './src/lib/agents/core/locator';
-import { ProfilerAgent } from './src/lib/agents/core/profiler';
+import { LocatorAgent } from './src/agents/discovery/locator';
+import { ProfilerAgent } from './src/agents/business-profiler/profiler';
 
 const queries = [
     "Bosphorus Nutley",

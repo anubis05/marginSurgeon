@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { discoveryParallelAgent } from "@/lib/agents/core/discoverySubAgents";
-import { BaseIdentity, EnrichedProfile } from "@/lib/agents/core/types";
+import { discoveryParallelAgent } from '@/agents/discovery/discoverySubAgents';
+import { BaseIdentity, EnrichedProfile } from '@/agents/types';
 import { Runner, InMemorySessionService } from "@google/adk";
 
 export async function POST(req: NextRequest) {

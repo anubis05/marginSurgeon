@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { BaseIdentity } from "./types";
+import { BaseIdentity } from '@/agents/types';
 import { ForecastResponse } from "@/components/Chatbot/types";
 import { FunctionTool, LlmAgent, ParallelAgent, Runner, InMemorySessionService } from "@google/adk";
 import { z } from "zod";
