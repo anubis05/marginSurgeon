@@ -14,6 +14,7 @@ export interface EnrichedProfile extends BaseIdentity {
     primaryColor?: string;
     secondaryColor?: string;
     logoUrl?: string;
+    favicon?: string;
     persona?: string;
     menuScreenshotBase64?: string;
     socialLinks?: {
@@ -21,6 +22,9 @@ export interface EnrichedProfile extends BaseIdentity {
         facebook?: string;
         twitter?: string;
     };
+    phone?: string;
+    email?: string;
+    hours?: string;
     googleMapsUrl?: string;
     competitors?: {
         name: string;

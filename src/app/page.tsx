@@ -542,6 +542,19 @@ export default function Home() {
             ))}
           </ul>
         </div>
+
+        {competitiveReport.sources?.length > 0 && (
+          <div className="p-6 rounded-2xl bg-slate-800/40 border border-white/10 mt-6">
+            <h3 className="text-slate-400 font-bold mb-3 text-sm uppercase tracking-wider">Analysis Sources</h3>
+            <ul className="space-y-1">
+              {competitiveReport.sources.map((s: any, i: number) => (
+                <li key={i}>
+                  <a href={s.url} target="_blank" rel="noreferrer" className="text-indigo-400 text-sm hover:underline">↗ {s.title || s.url}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
   };

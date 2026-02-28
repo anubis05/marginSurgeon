@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         });
 
         const prompt = `
-            Please discover the menu, social links, Google Maps URL, and exactly 3 local competitors for:
+            Please discover the menu, social links, Google Maps URL, brand theme assets, and exactly 3 local competitors for:
             Name: ${identity.name}
             Address: ${identity.address}
             URL: ${identity.officialUrl}
@@ -101,6 +101,19 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Safely parse theme data
+        let parsedTheme: any = {};
+        if (typeof state.themeData === 'string') {
+            try {
+                const cleanStr = state.themeData.replace(/```json\n?|\n?```/g, '').trim();
+                parsedTheme = JSON.parse(cleanStr);
+            } catch (e) {
+                console.warn("[API/Discover] Failed to parse themeData JSON:", e);
+            }
+        } else if (typeof state.themeData === 'object' && state.themeData !== null) {
+            parsedTheme = state.themeData as any;
+        }
+
         const socials = parsedSocials as any;
         const enrichedProfile: EnrichedProfile = {
             ...identity,
@@ -114,7 +127,12 @@ export async function POST(req: NextRequest) {
             email: socials.email || undefined,
             hours: socials.hours || undefined,
             googleMapsUrl: state.googleMapsUrl as string | undefined,
-            competitors: parsedCompetitors.length > 0 ? parsedCompetitors : undefined
+            competitors: parsedCompetitors.length > 0 ? parsedCompetitors : undefined,
+            favicon: parsedTheme.favicon || undefined,
+            logoUrl: parsedTheme.logoUrl || undefined,
+            primaryColor: parsedTheme.primaryColor || undefined,
+            secondaryColor: parsedTheme.secondaryColor || undefined,
+            persona: parsedTheme.persona || undefined,
         };
 
         const slug = generateSlug(enrichedProfile.name);

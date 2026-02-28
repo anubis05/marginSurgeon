@@ -58,6 +58,7 @@ export interface Methodology {
     reasoningSteps: string[];
     toolsUsed: string[];
     searchQueries?: string[];
+    sourcesUsed?: { url: string; title: string }[];
 }
 
 export interface AuditSection {

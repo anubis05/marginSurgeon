@@ -31,6 +31,12 @@ export const SeoAuditorAgent = new LlmAgent({
 
        For each section, you MUST provide 'id', 'title', 'score', 'description', detailed 'recommendations', and your internal 'methodology' showing precisely what checks were performed.
 
+       The 'methodology' for each section MUST include:
+       - 'reasoningSteps': array of reasoning steps
+       - 'toolsUsed': array of tool names used
+       - 'searchQueries': array of search queries run (if any)
+       - 'sourcesUsed': array of { "url": "https://...", "title": "page title or description" } for every page, URL, or resource searched or audited for that section
+
        OUTPUT STRICTLY VALID JSON! NO MARKDOWN. NO CODE BLOCKS.`,
     model: AgentModels.DEEP_ANALYST_MODEL,
 

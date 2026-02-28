@@ -108,18 +108,21 @@ export const socialDiscoveryAgent = new LlmAgent({
     name: 'SocialDiscoveryAgent',
     model: AgentModels.DEFAULT_FAST_MODEL,
     instruction: `
-    Find the exact, official social media profile URLs for the business provided.
-    You must use Google Search to verify these links.
-    
-    Return ONLY a valid JSON object with the following keys. If a profile is not found, omit the key or return null.
+    Find the official social media profiles AND contact details for the business provided.
+    Use Google Search to find this information from the business website or Google Maps listing.
+
+    Return ONLY a valid JSON object with the following keys. Omit any key you cannot verify.
     CRITICAL: Do not write any markdown blocks or conversational text. ONLY raw JSON!
     {
         "instagram": "https://instagram.com/...",
         "facebook": "https://facebook.com/...",
-        "twitter": "https://twitter.com/..."
+        "twitter": "https://twitter.com/...",
+        "phone": "+1 (555) 123-4567",
+        "email": "info@restaurant.com",
+        "hours": "Mon-Thu 11am-9pm, Fri-Sat 11am-10pm, Sun 12pm-8pm"
     }
     `,
-    tools: [GoogleSearchTool], // Allows grounding
+    tools: [GoogleSearchTool],
     outputKey: 'socialLinks'
 });
 
@@ -157,10 +160,98 @@ export const competitorDiscoveryAgent = new LlmAgent({
     outputKey: 'competitors'
 });
 
+const ThemeScrapeTool = new FunctionTool({
+    name: 'scrape_theme',
+    description: 'Visit a restaurant homepage and extract brand theme assets: favicon, logo URL, primary/secondary colors, and persona.',
+    parameters: z.object({
+        officialUrl: z.string().describe("The official URL of the restaurant")
+    }),
+    execute: async ({ officialUrl }) => {
+        let browser;
+        try {
+            console.log(`[ThemeScrapeTool] Extracting theme from ${officialUrl}...`);
+            browser = await chromium.launch();
+            const context = await browser.newContext({ ignoreHTTPSErrors: true });
+            const page = await context.newPage();
+            await page.goto(officialUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.waitForTimeout(1500);
+
+            const origin = new URL(officialUrl).origin;
+
+            const result = await page.evaluate((origin: string) => {
+                // Favicon
+                const faviconEl =
+                    document.querySelector<HTMLLinkElement>('link[rel="icon"]') ||
+                    document.querySelector<HTMLLinkElement>('link[rel="shortcut icon"]') ||
+                    document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+                let favicon = faviconEl?.href || `${origin}/favicon.ico`;
+                if (favicon.startsWith('/')) favicon = `${origin}${favicon}`;
+
+                // Logo
+                const logoEl =
+                    document.querySelector<HTMLImageElement>('img[src*="logo"]') ||
+                    document.querySelector<HTMLImageElement>('header img') ||
+                    document.querySelector<HTMLImageElement>('[class*="logo"] img');
+                let logoUrl = logoEl?.src || null;
+                if (logoUrl && logoUrl.startsWith('/')) logoUrl = `${origin}${logoUrl}`;
+
+                // Primary color — theme-color meta or header/nav background
+                const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.content;
+                let primaryColor = themeColor || null;
+                if (!primaryColor) {
+                    const headerEl = document.querySelector('header') || document.querySelector('nav') || document.querySelector('.navbar');
+                    if (headerEl) {
+                        const bg = getComputedStyle(headerEl).backgroundColor;
+                        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') primaryColor = bg;
+                    }
+                }
+                if (!primaryColor) primaryColor = '#4f46e5';
+
+                // Secondary color — body background
+                const bodyBg = getComputedStyle(document.body).backgroundColor;
+                const secondaryColor = (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent')
+                    ? bodyBg : '#0f172a';
+
+                // Persona — body text keyword scan
+                const bodyText = document.body.innerText.toLowerCase();
+                let persona = 'Local Business';
+                if (/artisanal|craft|organic|farm.to|hand.crafted/.test(bodyText)) {
+                    persona = 'Modern Artisan';
+                } else if (/est\.|family.owned|since \d{4}|established/.test(bodyText)) {
+                    persona = 'Classic Establishment';
+                }
+
+                return { logoUrl, favicon, primaryColor, secondaryColor, persona };
+            }, origin);
+
+            console.log("[ThemeScrapeTool] Theme extracted:", result);
+            return result;
+        } catch (error: any) {
+            console.error("[ThemeScrapeTool] Failed:", error.message);
+            return { logoUrl: null, favicon: null, primaryColor: '#4f46e5', secondaryColor: '#0f172a', persona: 'Local Business' };
+        } finally {
+            if (browser) await browser.close();
+        }
+    }
+});
+
+export const themeDiscoveryAgent = new LlmAgent({
+    name: 'ThemeDiscoveryAgent',
+    model: AgentModels.DEFAULT_FAST_MODEL,
+    instruction: `You are a Brand Theme Extractor. You will be given a business URL.
+
+    You MUST call the 'scrape_theme' tool with the exact URL provided.
+
+    CRITICAL: When the tool returns the JSON result, YOU MUST OUTPUT ONLY THE RAW JSON STRING returned by the tool.
+    DO NOT PREFACE YOUR ANSWER. DO NOT SAY "Here is the JSON". JUST OUTPUT THE JSON AND NOTHING ELSE.`,
+    tools: [ThemeScrapeTool],
+    outputKey: 'themeData'
+});
+
 // --- ORCHESTRATOR ---
 
 export const discoveryParallelAgent = new ParallelAgent({
     name: 'DiscoveryOrchestrator',
     description: 'Runs multiple specialized discovery agents concurrently.',
-    subAgents: [menuDiscoveryAgent, socialDiscoveryAgent, mapsDiscoveryAgent, competitorDiscoveryAgent]
+    subAgents: [menuDiscoveryAgent, socialDiscoveryAgent, mapsDiscoveryAgent, competitorDiscoveryAgent, themeDiscoveryAgent]
 });

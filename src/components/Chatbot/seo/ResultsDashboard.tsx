@@ -413,6 +413,22 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ report, groundingCh
                                 </ul>
                               </div>
                             )}
+                            {section.methodology.sourcesUsed && section.methodology.sourcesUsed.length > 0 && (
+                              <div className="mt-2">
+                                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sources Consulted</h5>
+                                <div className="flex flex-wrap gap-2">
+                                  {section.methodology.sourcesUsed.map((s, i) => {
+                                    let hostname = s.url;
+                                    try { hostname = new URL(s.url).hostname; } catch {}
+                                    return (
+                                      <a key={i} href={s.url} target="_blank" rel="noreferrer" className="text-indigo-400 text-xs hover:underline">
+                                        ↗ {s.title || hostname}
+                                      </a>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

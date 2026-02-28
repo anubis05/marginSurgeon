@@ -63,8 +63,13 @@ export const MarketPositioningAgent = new LlmAgent({
            "threat_level": 1 to 10 (integer)
          }
       ],
-      "strategic_advantages": ["Advantage 1 text", "Advantage 2 text"]
+      "strategic_advantages": ["Advantage 1 text", "Advantage 2 text"],
+      "sources": [
+        { "url": "https://...", "title": "Source name or page title" }
+      ]
     }
-    
+
+    In "sources", list every URL referenced or cited when forming this analysis. Include any competitor websites, social profiles, review pages, or news articles consulted.
+
     DO NOT output markdown formatting like \`\`\`json. ONLY output raw JSON. Avoid conversational filler.`
 });

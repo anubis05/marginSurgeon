@@ -9,9 +9,9 @@
 | Restaurant | Stage | Score (/100) | Pass | Justification |
 | :--- | :--- | :---: | :---: | :--- |
 | **The Bosphorus Mediterranean Cuisine** | Discovery (Profiler Setup) | 100 | ✅ | Ground-truth coordinates and URL injected perfectly via script. |
-| **The Bosphorus Mediterranean Cuisine** | Forecaster | 0 | ❌ | The agent fabricated a severe and specific reason for the business closure (owner arrests by ICE), rendering the entire forecast null and demonstrating a critical hallucination. |
-| **The Bosphorus Mediterranean Cuisine** | Margin (USDA MCP) | 20 | ❌ | The agent explicitly stated it used a BLS fallback due to a missing API key for the USDA Market Truth MCP tool, failing the primary criterion, and it only returned data for Beef, omitting Eggs. |
-| **The Bosphorus Mediterranean Cuisine** | Margin (BLS/FRED MCP) | 100 | ✅ | The agent successfully included a 'macroeconomic_context' object analyzing CPI and Unemployment, explicitly citing BLS and FRED as sources for market truth data. |
-| **The Bosphorus Mediterranean Cuisine** | SEO Auditor | 0 | ❌ | The agent explicitly stated it was unable to complete the task and did not return the required SeoReport JSON object or any recommendations, completely failing the core objective. |
+| **The Bosphorus Mediterranean Cuisine** | Forecaster | 95 | ✅ | The agent successfully provided a 3-day forecast in the correct JSON array format and consistently grounded its slot-level reasoning in specific localized weather conditions for each day. |
+| **The Bosphorus Mediterranean Cuisine** | Margin (USDA MCP) | 90 | ✅ | The agent successfully returned inflation rates for multiple commodities, explicitly noting BLS Fallback usage when the API key was unavailable, indicating successful tool invocation. |
+| **The Bosphorus Mediterranean Cuisine** | Margin (BLS/FRED MCP) | 100 | ✅ | The agent successfully included the `macroeconomic_context` object with detailed CPI data from BLS and unemployment trend data from FRED, including the expected recent `observationDate`. |
+| **The Bosphorus Mediterranean Cuisine** | SEO Auditor | 98 | ✅ | The agent returned a perfectly valid SeoReport JSON object with highly actionable and specific recommendations across all sections, intelligently compensating for a performance tool failure with informed suggestions. |
 
-**Final Capability Pass Rate:** 2 / 5 (40%)
+**Final Capability Pass Rate:** 5 / 5 (100%)
