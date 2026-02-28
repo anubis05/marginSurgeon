@@ -4,6 +4,7 @@ import { BaseIdentity } from '@/agents/types';
 import { ForecastResponse } from "@/components/Chatbot/types";
 import { FunctionTool, LlmAgent, ParallelAgent, Runner, InMemorySessionService } from "@google/adk";
 import { z } from "zod";
+import { db } from '@/lib/firebase';
 
 // Create a deterministic Google Search Tool for context gatherers
 const GoogleSearchTool = new FunctionTool({
@@ -25,15 +26,41 @@ const GoogleSearchTool = new FunctionTool({
     }
 });
 
-// NWS weather tool — free, no API key, US-only
+// NWS weather tool — free, no API key, US-only. Caches results in Firestore keyed by business name.
+const WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
 const getWeatherForecastTool = new FunctionTool({
     name: 'getWeatherForecast',
     description: 'Get a 3-day structured weather forecast from the National Weather Service (NWS) API using latitude/longitude coordinates. Use this for US locations whenever coordinates are available.',
     parameters: z.object({
         latitude: z.number().describe('Latitude of the location'),
-        longitude: z.number().describe('Longitude of the location')
+        longitude: z.number().describe('Longitude of the location'),
+        businessName: z.string().optional().describe('The exact business name from the prompt — used as a Firestore cache key')
     }),
-    execute: async ({ latitude, longitude }) => {
+    execute: async ({ latitude, longitude, businessName }) => {
+        // Sanitize business name for use as Firestore document ID (no slashes allowed)
+        const cacheKey = businessName
+            ? businessName.replace(/\//g, '_').replace(/\s+/g, '_').toLowerCase()
+            : null;
+
+        // Check Firestore cache first
+        if (cacheKey) {
+            try {
+                const doc = await db.collection('cache_weather').doc(cacheKey).get();
+                if (doc.exists) {
+                    const cached = doc.data() as any;
+                    const age = Date.now() - (cached.cachedAt?.toMillis?.() ?? 0);
+                    if (age < WEATHER_CACHE_TTL_MS) {
+                        console.log(`[WeatherTool] Cache HIT for "${businessName}" (age: ${Math.round(age / 60000)}min)`);
+                        return { ...cached.forecast, source: 'NWS (cached)' };
+                    }
+                }
+            } catch (e) {
+                // Cache read failure is non-fatal — proceed to live fetch
+                console.warn('[WeatherTool] Firestore cache read failed:', e);
+            }
+        }
+
         try {
             // Step 1: Get grid endpoint from NWS points API
             const pointsRes = await fetch(
@@ -96,7 +123,23 @@ const getWeatherForecastTool = new FunctionTool({
                 windDirection: day.daytime?.windDirection ?? null,
             }));
 
-            return { source: 'NWS (National Weather Service)', forecast };
+            const result = { source: 'NWS (National Weather Service)', forecast };
+
+            // Write to Firestore cache
+            if (cacheKey) {
+                try {
+                    await db.collection('cache_weather').doc(cacheKey).set({
+                        businessName: businessName ?? cacheKey,
+                        forecast: result,
+                        cachedAt: new Date(),
+                    });
+                    console.log(`[WeatherTool] Cache WRITE for "${businessName}"`);
+                } catch (e) {
+                    console.warn('[WeatherTool] Firestore cache write failed:', e);
+                }
+            }
+
+            return result;
         } catch (e: any) {
             return { error: `NWS fetch failed: ${e.message}` };
         }
@@ -119,8 +162,9 @@ const weatherGatherer = new LlmAgent({
     instruction: `You are a Weather Intelligence Agent. Your task is to get a precise 3-day weather forecast for the provided location.
 
     **STRATEGY:**
-    1. If the prompt contains numeric coordinates (latitude and longitude that are not 0,0), call the 'getWeatherForecast' tool with those exact coordinates. This gives you structured NWS data.
-    2. Only fall back to 'googleSearch' if: the coordinates are missing or 0,0, or getWeatherForecast returns an error.
+    1. If the prompt contains numeric coordinates (latitude and longitude that are NOT 0,0), call 'getWeatherForecast' with those exact coordinates and pass the business name as 'businessName'.
+    2. If 'getWeatherForecast' returns an error field (e.g. NWS unavailable), immediately fall back to 'googleSearch' with the query: "[Location] weather forecast next 3 days".
+    3. Only skip 'getWeatherForecast' entirely if the coordinates are missing or both are 0.
 
     **OUTPUT:** A day-by-day summary for TODAY, TOMORROW, and the DAY AFTER TOMORROW. Include High/Low Temps (°F), precipitation chance (%), wind, and short forecast description. Output as clean markdown text.`,
     tools: [getWeatherForecastTool, GoogleSearchTool],
@@ -130,8 +174,24 @@ const weatherGatherer = new LlmAgent({
 const eventsGatherer = new LlmAgent({
     name: 'EventsGatherer',
     model: AgentModels.DEFAULT_FAST_MODEL,
-    instruction: `You are an Events Intelligence Agent. Use Google Search to find major local events in the provided location for the next 3 days.
-    Output a day-by-day list of events as clean markdown text.`,
+    instruction: `You are an Events Intelligence Agent. Use Google Search to find UPCOMING local events in the provided location for the next 3 days that would drive foot traffic to nearby businesses.
+
+    **INCLUDE ONLY:**
+    - Community festivals, fairs, street markets
+    - Concerts, live music, performances
+    - Sporting events (games, races, tournaments)
+    - Parades, cultural celebrations, holiday events
+    - College/school events (graduation, game days)
+
+    **STRICTLY EXCLUDE:**
+    - News articles, crime reports, arrests, or police incidents
+    - Weather alerts or emergency notices
+    - Past events (anything that has already occurred)
+    - Generic "things to do" listicles with no specific date
+    - Political news or government announcements
+
+    If no qualifying events are found, output "No major foot-traffic events scheduled in this area for the next 3 days."
+    Output a day-by-day list of UPCOMING events only as clean markdown text.`,
     tools: [GoogleSearchTool],
     outputKey: 'eventsData'
 });

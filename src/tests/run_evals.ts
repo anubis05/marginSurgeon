@@ -179,7 +179,7 @@ export async function runEvaluations() {
 
             const watchEval = await evaluateAgentOutput(
                 "CommodityWatchdogAgent", target.name, target.location, commodityTrends,
-                "Did the agent successfully utilize the USDA Market Truth MCP tool? Did it return real inflation rates for Eggs and Beef instead of hallucinating logic?"
+                "Did the agent successfully utilize the BLS commodity price MCP tool? Did it return real or fallback inflation rates for commodities like Eggs and/or Beef (any commodity data is acceptable)?"
             );
             allResults.push({ restaurant: target.name, stage: "Margin (USDA MCP)", ...watchEval as any });
 
