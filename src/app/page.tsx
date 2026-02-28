@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search as SearchIcon, MapPin, Building2, Store, Loader2, ArrowRight, Activity, Percent, DollarSign, TrendingUp, AlertTriangle, Scale, Target, Swords, BrainCircuit, X, Download, BarChart3, Users, Search } from 'lucide-react';
+import { Search as SearchIcon, MapPin, Building2, Store, Loader2, ArrowRight, Activity, Percent, DollarSign, TrendingUp, AlertTriangle, Scale, Target, Swords, BrainCircuit, X, Download, BarChart3, Users, Search, Share2 } from 'lucide-react';
 import { SurgicalReport } from '@/lib/types';
 import clsx from 'clsx';
 import ChatInterface from '@/components/Chatbot/ChatInterface';
@@ -41,9 +41,6 @@ export default function Home() {
   const [showEmailWall, setShowEmailWall] = useState(false);
   const [hasProvidedEmail, setHasProvidedEmail] = useState(false);
   const [pendingCapability, setPendingCapability] = useState<string | null>(null);
-
-  // Feature Flags
-  const [isAdvancedMcpEnabled, setIsAdvancedMcpEnabled] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -196,8 +193,8 @@ export default function Home() {
         // We now pass the enriched business down to /api/analyze to skip Crawler if menuScreenshotBase64 exists
         const payload = {
           url: locatedBusiness.officialUrl,
-          enrichedProfile: locatedBusiness, // Contains menuScreenshotBase64
-          advancedMode: isAdvancedMcpEnabled
+          enrichedProfile: locatedBusiness,
+          advancedMode: false
         };
         const res = await fetch('/api/analyze', {
           method: 'POST',
@@ -280,6 +277,11 @@ export default function Home() {
       } finally {
         setIsTyping(false);
       }
+    } else if (capId === 'marketing') {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(), role: 'model',
+        text: `Social Media Strategy for **${locatedBusiness.name}** is coming soon! This module will auto-generate platform-specific posts, campaign ideas, and content calendars based on your business profile and local market data.`
+      }]);
     } else if (capId === 'competitive') {
       const msgId = Date.now().toString();
       setMessages(prev => [...prev, { id: msgId, role: 'model', text: "Deploying Competitive Analyzer to compare your business against exactly 3 local rivals... ⏱️" }]);
@@ -518,6 +520,7 @@ export default function Home() {
   };
 
   const isCentered = !locatedBusiness && !report && !forecast && !seoReport && !competitiveReport;
+  const hasActiveReport = !!(report || forecast || seoReport || competitiveReport);
 
   return (
     <main className={`flex h-screen w-screen overflow-hidden relative transition-colors duration-700 ${isCentered ? 'bg-white' : 'bg-slate-950'}`}>
@@ -529,49 +532,47 @@ export default function Home() {
         </div>
       )}
 
-      {/* LEFT VISUALIZER PANEL - Hidden when centered */}
-      <div className={`relative z-10 transition-all duration-700 ease-in-out flex flex-col ${isCentered ? 'w-0 opacity-0 overflow-hidden' : 'flex-1 opacity-100'}`}>
+      {/* LEFT VISUALIZER PANEL - Hidden when centered, narrow map sidebar when no report active */}
+      <div className={`relative z-10 transition-all duration-700 ease-in-out flex flex-col ${
+        isCentered ? 'w-0 opacity-0 overflow-hidden'
+        : hasActiveReport ? 'flex-1 opacity-100'
+        : 'w-[380px] flex-shrink-0 opacity-100'
+      }`}>
         {!isCentered && (
           <>
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 animate-fade-in-up pointer-events-auto bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-gray-200/80">
               <button onClick={() => handleSelectCapability("surgery")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 hover:text-indigo-600 hover:bg-indigo-50/80 transition-all group">
                 <BarChart3 className="w-3.5 h-3.5 text-indigo-500 group-hover:scale-110 transition-transform" />
-                Menu Margins
+                Margin Analysis
               </button>
 
               <div className="w-px h-4 bg-gray-200 mx-1"></div>
 
               <button onClick={() => handleSelectCapability("traffic")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 hover:text-emerald-600 hover:bg-emerald-50/80 transition-all group">
                 <Users className="w-3.5 h-3.5 text-emerald-500 group-hover:scale-110 transition-transform" />
-                Foot Traffic
+                Traffic Forecast
               </button>
 
               <div className="w-px h-4 bg-gray-200 mx-1"></div>
 
               <button onClick={() => handleSelectCapability("seo")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 hover:text-purple-600 hover:bg-purple-50/80 transition-all group">
                 <SearchIcon className="w-3.5 h-3.5 text-purple-500 group-hover:scale-110 transition-transform" />
-                SEO Auditor
+                SEO Audit
               </button>
 
               <div className="w-px h-4 bg-gray-200 mx-1"></div>
 
               <button onClick={() => handleSelectCapability("competitive")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 hover:text-orange-600 hover:bg-orange-50/80 transition-all group">
                 <Swords className="w-3.5 h-3.5 text-orange-500 group-hover:scale-110 transition-transform" />
-                Competitors
+                Competitive Intel
               </button>
 
               <div className="w-px h-4 bg-gray-200 mx-1"></div>
 
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 bg-slate-50/50">
-                <input
-                  type="checkbox"
-                  id="advanced-mcp-toggle"
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                  checked={isAdvancedMcpEnabled}
-                  onChange={(e) => setIsAdvancedMcpEnabled(e.target.checked)}
-                />
-                <label htmlFor="advanced-mcp-toggle" className="cursor-pointer select-none">Advanced (Live Data)</label>
-              </div>
+              <button onClick={() => handleSelectCapability("marketing")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 hover:text-pink-600 hover:bg-pink-50/80 transition-all group">
+                <Share2 className="w-3.5 h-3.5 text-pink-500 group-hover:scale-110 transition-transform" />
+                Social Media
+              </button>
             </div>
 
             {report ? (
@@ -595,8 +596,12 @@ export default function Home() {
         )}
       </div>
 
-      {/* RIGHT CHATBOT PANEL - Expands to full screen when centered */}
-      <div className={`relative z-20 flex-shrink-0 transition-all duration-700 ease-in-out h-full ${isCentered ? 'w-full max-w-none' : 'w-full max-w-[420px]'}`}>
+      {/* RIGHT CHATBOT PANEL - Full screen when centered, primary flex-1 during map phase, sidebar during report */}
+      <div className={`relative z-20 transition-all duration-700 ease-in-out h-full ${
+        isCentered ? 'w-full max-w-none'
+        : hasActiveReport ? 'w-full max-w-[420px] flex-shrink-0'
+        : 'flex-1 min-w-0'
+      }`}>
         <ChatInterface
           messages={messages}
           onSendMessage={sendMessage}
