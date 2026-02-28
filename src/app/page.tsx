@@ -520,7 +520,6 @@ export default function Home() {
   };
 
   const isCentered = !locatedBusiness && !report && !forecast && !seoReport && !competitiveReport;
-  const hasActiveReport = !!(report || forecast || seoReport || competitiveReport);
 
   return (
     <main className={`flex h-screen w-screen overflow-hidden relative transition-colors duration-700 ${isCentered ? 'bg-white' : 'bg-slate-950'}`}>
@@ -532,12 +531,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* LEFT VISUALIZER PANEL - Hidden when centered, narrow map sidebar when no report active */}
-      <div className={`relative z-10 transition-all duration-700 ease-in-out flex flex-col ${
-        isCentered ? 'w-0 opacity-0 overflow-hidden'
-        : hasActiveReport ? 'flex-1 opacity-100'
-        : 'w-[380px] flex-shrink-0 opacity-100'
-      }`}>
+      {/* LEFT VISUALIZER PANEL - Hidden when centered, fills remaining space when active */}
+      <div className={`relative z-10 transition-all duration-700 ease-in-out flex flex-col ${isCentered ? 'w-0 opacity-0 overflow-hidden' : 'flex-1 opacity-100'}`}>
         {!isCentered && (
           <>
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 animate-fade-in-up pointer-events-auto bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-gray-200/80">
@@ -596,12 +591,8 @@ export default function Home() {
         )}
       </div>
 
-      {/* RIGHT CHATBOT PANEL - Full screen when centered, primary flex-1 during map phase, sidebar during report */}
-      <div className={`relative z-20 transition-all duration-700 ease-in-out h-full ${
-        isCentered ? 'w-full max-w-none'
-        : hasActiveReport ? 'w-full max-w-[420px] flex-shrink-0'
-        : 'flex-1 min-w-0'
-      }`}>
+      {/* RIGHT CHATBOT PANEL - Full screen when centered, narrow sidebar when active */}
+      <div className={`relative z-20 flex-shrink-0 transition-all duration-700 ease-in-out h-full ${isCentered ? 'w-full max-w-none' : 'w-[340px]'}`}>
         <ChatInterface
           messages={messages}
           onSendMessage={sendMessage}

@@ -132,58 +132,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     {/* Home Screen Capabilities UI */}
                     {isCentered && messages.length === 1 && (
                         <div className="w-full mt-12 mb-8 animate-fade-in-up">
-                            <div className="text-center mb-8">
-                                <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-2">Agentic Capabilities</h2>
-                                <p className="text-gray-500 font-medium text-sm">Search for any restaurant or local business to unlock these deep-intelligence tools.</p>
+                            <div className="text-center mb-6">
+                                <h2 className="text-xl font-black text-gray-900 tracking-tight mb-1">Agentic Capabilities</h2>
+                                <p className="text-gray-400 text-xs">Search for a business to unlock these tools.</p>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <button onClick={() => onSendMessage("Analyze menu for profit leaks")} className="bg-white/80 hover:bg-white border border-gray-100 p-5 rounded-3xl shadow-xl shadow-indigo-500/5 backdrop-blur-xl transition-all hover:-translate-y-1 text-left group">
-                                    <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                        <BarChart3 className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-1">Margin Analysis</h3>
-                                    <p className="text-xs text-gray-500 leading-snug">Uncover profit leaks against live competitor pricing.</p>
-                                </button>
-
-                                <button onClick={() => onSendMessage("Analyze foot traffic for my location")} className="bg-white/80 hover:bg-white border border-gray-100 p-5 rounded-3xl shadow-xl shadow-emerald-500/5 backdrop-blur-xl transition-all hover:-translate-y-1 text-left group">
-                                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                        <Users className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-1">Traffic Forecast</h3>
-                                    <p className="text-xs text-gray-500 leading-snug">Predict demand using weather, events & local POI data.</p>
-                                </button>
-
-                                <button onClick={() => onSendMessage("Run SEO Audit")} className="bg-white/80 hover:bg-white border border-gray-100 p-5 rounded-3xl shadow-xl shadow-purple-500/5 backdrop-blur-xl transition-all hover:-translate-y-1 text-left group">
-                                    <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                        <SearchIcon className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-1">SEO Deep Audit</h3>
-                                    <p className="text-xs text-gray-500 leading-snug">Core Web Vitals, indexing health & content analysis.</p>
-                                </button>
-
-                                <button onClick={() => onSendMessage("Run Competitive Analysis")} className="bg-white/80 hover:bg-white border border-gray-100 p-5 rounded-3xl shadow-xl shadow-orange-500/5 backdrop-blur-xl transition-all hover:-translate-y-1 text-left group">
-                                    <div className="w-10 h-10 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                        <Swords className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-1">Competitive Intel</h3>
-                                    <p className="text-xs text-gray-500 leading-snug">Map rivals, threat levels & market gaps in real time.</p>
-                                </button>
-
-                                <button onClick={() => onSendMessage("Generate social media strategy and marketing content")} className="bg-white/80 hover:bg-white border border-gray-100 p-5 rounded-3xl shadow-xl shadow-pink-500/5 backdrop-blur-xl transition-all hover:-translate-y-1 text-left group">
-                                    <div className="w-10 h-10 rounded-2xl bg-pink-50 text-pink-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                        <Share2 className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-1">Social Media Strategy</h3>
-                                    <p className="text-xs text-gray-500 leading-snug">Auto-generate posts, captions & content campaigns.</p>
-                                </button>
-
-                                <button onClick={() => onSendMessage("Show me local market economic insights")} className="bg-white/80 hover:bg-white border border-gray-100 p-5 rounded-3xl shadow-xl shadow-teal-500/5 backdrop-blur-xl transition-all hover:-translate-y-1 text-left group">
-                                    <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                        <TrendingUp className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-1">Market Insights</h3>
-                                    <p className="text-xs text-gray-500 leading-snug">Live CPI, unemployment & commodity inflation trends.</p>
-                                </button>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                                {([
+                                    { msg: "Analyze menu for profit leaks", icon: <BarChart3 className="w-3.5 h-3.5" />, label: "Margin Analysis", cls: "bg-indigo-50 text-indigo-600" },
+                                    { msg: "Analyze foot traffic for my location", icon: <Users className="w-3.5 h-3.5" />, label: "Traffic Forecast", cls: "bg-emerald-50 text-emerald-600" },
+                                    { msg: "Run SEO Audit", icon: <SearchIcon className="w-3.5 h-3.5" />, label: "SEO Deep Audit", cls: "bg-purple-50 text-purple-600" },
+                                    { msg: "Run Competitive Analysis", icon: <Swords className="w-3.5 h-3.5" />, label: "Competitive Intel", cls: "bg-orange-50 text-orange-600" },
+                                    { msg: "Generate social media strategy and marketing content", icon: <Share2 className="w-3.5 h-3.5" />, label: "Social Media", cls: "bg-pink-50 text-pink-600" },
+                                    { msg: "Show me local market economic insights", icon: <TrendingUp className="w-3.5 h-3.5" />, label: "Market Insights", cls: "bg-teal-50 text-teal-600" },
+                                ] as const).map(({ msg, icon, label, cls }) => (
+                                    <button key={label} onClick={() => onSendMessage(msg)}
+                                        className="bg-white/80 hover:bg-white border border-gray-100 px-3 py-2.5 rounded-xl shadow-sm backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:shadow-md flex items-center gap-2.5 text-left group">
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${cls}`}>
+                                            {icon}
+                                        </div>
+                                        <span className="text-xs font-semibold text-gray-800 leading-tight">{label}</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     )}
