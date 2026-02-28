@@ -15,7 +15,7 @@ import { NeuralBackground } from '@/components/Chatbot/NeuralBackground';
 import { EmailWall } from '@/components/Chatbot/EmailWall';
 import ResultsDashboard from '@/components/Chatbot/seo/ResultsDashboard';
 import ProfileCard from '@/components/Chatbot/ProfileCard';
-import { SeoReport } from '@/lib/types';
+import { SeoReport, SocialStrategyReport } from '@/lib/types';
 
 export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -32,6 +32,7 @@ export default function Home() {
   const [forecast, setForecast] = useState<ForecastResponse | null>(null);
   const [seoReport, setSeoReport] = useState<SeoReport | null>(null);
   const [competitiveReport, setCompetitiveReport] = useState<any | null>(null);
+  const [socialReport, setSocialReport] = useState<SocialStrategyReport | null>(null);
 
   // Detail Panel State for Traffic Forecast Phase 14
   const [selectedDay, setSelectedDay] = useState<DailyForecast | null>(null);
@@ -124,6 +125,7 @@ export default function Home() {
         setForecast(null);
         setSeoReport(null);
         setCompetitiveReport(null);
+        setSocialReport(null);
         setCapabilities([]); // Clear capabilities initially
 
         // Spawn Background Discovery
@@ -305,6 +307,33 @@ export default function Home() {
 
       } catch (e: any) {
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: `Failed to execute Competitive Analysis: ${e.message}` }]);
+      } finally {
+        setIsTyping(false);
+      }
+    } else if (capId === 'social') {
+      const msgId = Date.now().toString();
+      setMessages(prev => [...prev, { id: msgId, role: 'model', text: "Deploying Social Strategy Agent — auditing your channels and mapping competitor social presence... ⏱️" }]);
+      setCapabilities([]);
+      setIsTyping(true);
+
+      try {
+        const res = await fetch('/api/capabilities/social-strategy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identity: locatedBusiness }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Analysis Failed');
+        }
+
+        const data = await res.json();
+        setSocialReport(data);
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: `Social Strategy complete! Overall score: ${data.overallScore}/100. ${data.executiveSummary?.split('.')[0]}.` }]);
+
+      } catch (e: any) {
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: `Failed to run Social Strategy: ${e.message}` }]);
       } finally {
         setIsTyping(false);
       }
@@ -518,7 +547,160 @@ export default function Home() {
     );
   };
 
-  const isCentered = !locatedBusiness && !report && !forecast && !seoReport && !competitiveReport;
+  const renderSocialReport = () => {
+    if (!socialReport) return null;
+    const scoreColor = socialReport.overallScore >= 70 ? '#4ade80' : socialReport.overallScore >= 40 ? '#facc15' : '#f87171';
+    return (
+      <div className="w-full h-full overflow-y-auto pb-20 p-8 pt-12 animate-fade-in" style={{ backgroundColor: '#0f172a', color: '#ffffff' }}>
+        <header className="flex justify-between items-center mb-8 p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <Activity size={28} className="text-pink-400" />
+            <div>
+              <h1 className="text-2xl font-bold text-pink-400">Social Media Strategy</h1>
+              <p className="text-sm opacity-60">{socialReport.business.name}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-xs opacity-50 uppercase tracking-wider mb-1">Overall Score</div>
+              <div className="text-4xl font-black" style={{ color: scoreColor }}>{socialReport.overallScore}<span className="text-lg font-normal opacity-50">/100</span></div>
+            </div>
+            <button onClick={() => setSocialReport(null)} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors" title="Close">
+              <X size={20} />
+            </button>
+          </div>
+        </header>
+
+        {/* Executive Summary */}
+        <div className="p-6 rounded-2xl bg-pink-900/20 border border-pink-500/30 mb-6">
+          <h3 className="text-pink-300 font-bold mb-2 flex items-center gap-2"><BrainCircuit size={16} /> Executive Summary</h3>
+          <p className="text-slate-300 text-sm leading-relaxed">{socialReport.executiveSummary}</p>
+        </div>
+
+        {/* Channel Audits */}
+        {socialReport.channelAudits?.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2"><Activity size={18} className="text-pink-400" /> Your Channel Scores</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {socialReport.channelAudits.map((ch, i) => {
+                const chColor = ch.score >= 70 ? '#4ade80' : ch.score >= 40 ? '#facc15' : '#f87171';
+                return (
+                  <div key={i} className="p-5 rounded-2xl bg-black/40 border border-white/10">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-bold text-white">{ch.platform}</span>
+                      <span className="text-lg font-bold" style={{ color: chColor }}>{ch.score}/100</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-white/10 mb-3">
+                      <div className="h-1.5 rounded-full transition-all" style={{ width: `${ch.score}%`, backgroundColor: chColor }} />
+                    </div>
+                    {ch.postingFrequency && <p className="text-xs text-slate-400 mb-1">Frequency: {ch.postingFrequency}</p>}
+                    {ch.topContentType && <p className="text-xs text-slate-400 mb-2">Top Content: {ch.topContentType}</p>}
+                    {ch.weaknesses && ch.weaknesses.length > 0 && (
+                      <ul className="space-y-1">
+                        {ch.weaknesses.map((w, j) => <li key={j} className="text-xs text-red-300 flex gap-1.5 items-start"><AlertTriangle size={10} className="mt-0.5 flex-shrink-0" />{w}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Competitor Social Profiles */}
+        {socialReport.competitorProfiles?.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2"><Swords size={18} className="text-orange-400" /> Competitor Social Landscape</h3>
+            <div className="space-y-3">
+              {socialReport.competitorProfiles.map((comp, i) => (
+                <div key={i} className="p-4 rounded-2xl bg-black/40 border border-white/10">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-indigo-300">{comp.name}</span>
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">Threat: {comp.threatLevel}/10</span>
+                  </div>
+                  {comp.strongestPlatform && <p className="text-xs text-slate-400 mb-1">Strongest: <span className="text-pink-300">{comp.strongestPlatform}</span></p>}
+                  {comp.contentStrategy && <p className="text-xs text-slate-400 leading-relaxed">{comp.contentStrategy}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Gap Analysis */}
+        {socialReport.gapAnalysis?.length > 0 && (
+          <div className="p-6 rounded-2xl bg-yellow-900/20 border border-yellow-500/30 mb-6">
+            <h3 className="text-yellow-300 font-bold mb-3 flex items-center gap-2"><AlertTriangle size={16} /> Gap Analysis</h3>
+            <ul className="space-y-2">
+              {socialReport.gapAnalysis.map((gap, i) => (
+                <li key={i} className="text-sm text-slate-300 flex gap-2 items-start"><span className="text-yellow-400 mt-0.5">•</span>{gap}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Content Pillars */}
+        {socialReport.contentPillars?.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2"><Target size={18} className="text-purple-400" /> Content Pillars</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {socialReport.contentPillars.map((pillar, i) => (
+                <div key={i} className="p-5 rounded-2xl bg-purple-900/20 border border-purple-500/30">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-purple-300 text-sm">{pillar.name}</span>
+                    <span className="text-xs text-slate-400 ml-2 flex-shrink-0">{pillar.platform}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-2">Freq: {pillar.postingFrequency}</p>
+                  <p className="text-xs text-slate-300 mb-3 leading-relaxed">{pillar.rationale}</p>
+                  <div className="p-3 rounded-xl bg-purple-950/50 border border-purple-800/50">
+                    <p className="text-xs text-purple-200 italic">"{pillar.examplePrompt}"</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Wins */}
+        {socialReport.quickWins?.length > 0 && (
+          <div className="p-6 rounded-2xl bg-green-900/20 border border-green-500/30 mb-6">
+            <h3 className="text-green-300 font-bold mb-3 flex items-center gap-2"><TrendingUp size={16} /> Quick Wins — Do This Week</h3>
+            <ul className="space-y-2">
+              {socialReport.quickWins.map((win, i) => (
+                <li key={i} className="text-sm text-slate-300 flex gap-3 items-start p-3 rounded-xl bg-green-950/50 border border-green-800/50">
+                  <span className="text-green-400 font-bold flex-shrink-0">{i + 1}.</span>{win}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 30-Day Plan */}
+        {socialReport.thirtyDayPlan?.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-bold text-lg text-white mb-4 flex items-center gap-2"><Scale size={18} className="text-blue-400" /> 30-Day Action Plan</h3>
+            <div className="space-y-2">
+              {socialReport.thirtyDayPlan.map((step, i) => (
+                <div key={i} className="flex gap-4 p-4 rounded-xl bg-blue-900/20 border border-blue-500/20 items-start">
+                  <span className="w-7 h-7 rounded-full bg-blue-500/30 text-blue-300 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                  <p className="text-sm text-slate-300 leading-relaxed">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Full Report Link */}
+        {socialReport.reportUrl && (
+          <a href={socialReport.reportUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 font-bold text-white shadow-lg transition-all">
+            <ArrowRight size={20} /> View Full Interactive Report
+          </a>
+        )}
+      </div>
+    );
+  };
+
+  const isCentered = !locatedBusiness && !report && !forecast && !seoReport && !competitiveReport && !socialReport;
 
   return (
     <main className={`flex h-screen w-screen overflow-hidden relative transition-colors duration-700 ${isCentered ? 'bg-white' : 'bg-slate-950'}`}>
@@ -563,6 +745,13 @@ export default function Home() {
 
               <div className="w-px h-4 bg-gray-200 mx-1"></div>
 
+              <button onClick={() => handleSelectCapability("social")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 hover:text-pink-600 hover:bg-pink-50/80 transition-all group">
+                <Activity className="w-3.5 h-3.5 text-pink-500 group-hover:scale-110 transition-transform" />
+                Social Strategy
+              </button>
+
+              <div className="w-px h-4 bg-gray-200 mx-1"></div>
+
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 bg-slate-50/50">
                 <input
                   type="checkbox"
@@ -579,6 +768,8 @@ export default function Home() {
               renderSurgeonReport()
             ) : forecast ? (
               renderTrafficForecast()
+            ) : socialReport ? (
+              renderSocialReport()
             ) : competitiveReport ? (
               renderCompetitiveReport()
             ) : seoReport ? (
@@ -613,6 +804,8 @@ export default function Home() {
             setReport(null);
             setForecast(null);
             setSeoReport(null);
+            setCompetitiveReport(null);
+            setSocialReport(null);
             setCapabilities([]);
             setIsDiscovering(false);
           }}

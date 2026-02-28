@@ -20,6 +20,7 @@ Your job is to pick the single best distribution channel for this specific data 
 - SEO Audit → prefer Email or Blog (technical, conversion-focused)
 - Foot Traffic → prefer Substack or Instagram (visual patterns, broad interest)
 - Competitive Strategy → prefer Substack or Email (strategic, educational)
+- Social Strategy → prefer Instagram or Email (actionable & personal — specific channel scores)
 
 **OUTPUT:**
 Return a strict JSON object with exactly two keys:

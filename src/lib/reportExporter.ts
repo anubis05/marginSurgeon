@@ -19,13 +19,14 @@
  * Files are made publicly readable via makePublic() so no signed URLs are needed.
  */
 import * as admin from 'firebase-admin';
-import { renderSurgeonReportHtml }      from './reportTemplates/surgeonReport';
-import { renderTrafficReportHtml }      from './reportTemplates/trafficReport';
-import { renderSeoReportHtml }          from './reportTemplates/seoReport';
-import { renderCompetitiveReportHtml }  from './reportTemplates/competitiveReport';
+import { renderSurgeonReportHtml }        from './reportTemplates/surgeonReport';
+import { renderTrafficReportHtml }        from './reportTemplates/trafficReport';
+import { renderSeoReportHtml }            from './reportTemplates/seoReport';
+import { renderCompetitiveReportHtml }    from './reportTemplates/competitiveReport';
+import { renderSocialStrategyReportHtml } from './reportTemplates/socialStrategyReport';
 import { db } from './firebase';
 
-export type ReportType = 'surgery' | 'traffic' | 'seo' | 'competitive';
+export type ReportType = 'surgery' | 'traffic' | 'seo' | 'competitive' | 'social-strategy';
 
 export interface ExportMetadata {
     businessName: string;
@@ -59,7 +60,8 @@ function generateHtml(type: ReportType, data: any, reportUrl: string): string {
         case 'surgery':     return renderSurgeonReportHtml(data, reportUrl);
         case 'traffic':     return renderTrafficReportHtml(data, reportUrl);
         case 'seo':         return renderSeoReportHtml(data, reportUrl);
-        case 'competitive': return renderCompetitiveReportHtml(data, reportUrl);
+        case 'competitive':     return renderCompetitiveReportHtml(data, reportUrl);
+        case 'social-strategy': return renderSocialStrategyReportHtml(data, reportUrl);
         default: throw new Error(`Unknown report type: ${type}`);
     }
 }

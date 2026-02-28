@@ -89,6 +89,58 @@ export interface QuickScanResult {
     }[];
 }
 
+// ── Social Media Strategy types ───────────────────────────────────────────────
+
+export interface SocialChannelAudit {
+    platform: string;              // 'Instagram' | 'TikTok' | 'Facebook' | 'YouTube' | etc.
+    url?: string;
+    estimatedFollowers?: string;
+    postingFrequency?: string;     // e.g. '3x per week'
+    engagementLevel: 'none' | 'low' | 'medium' | 'high';
+    topContentType?: string;       // e.g. 'Food photography', 'Reels', 'Stories'
+    weaknesses?: string[];
+    score: number;                 // 0–100
+}
+
+export interface CompetitorSocialProfile {
+    name: string;
+    platforms: {
+        platform: string;
+        url?: string;
+        estimatedFollowers?: string;
+        contentStyle?: string;
+    }[];
+    strongestPlatform?: string;
+    totalEstimatedFollowers?: string;
+    contentStrategy?: string;
+    threatLevel: number;           // 1–10
+}
+
+export interface ContentPillar {
+    name: string;                  // e.g. 'Behind-the-Kitchen Reels'
+    platform: string;
+    postingFrequency: string;      // e.g. '3x per week'
+    rationale: string;
+    examplePrompt: string;         // Concrete post idea
+}
+
+export interface SocialStrategyReport {
+    business: {
+        name: string;
+        address?: string;
+    };
+    overallScore: number;          // 0–100
+    executiveSummary: string;
+    channelAudits: SocialChannelAudit[];
+    competitorProfiles: CompetitorSocialProfile[];
+    gapAnalysis: string[];         // Key gaps vs competitors
+    contentPillars: ContentPillar[];
+    quickWins: string[];           // 3–5 things to do this week
+    thirtyDayPlan: string[];       // Ordered weekly steps
+    reportUrl?: string;
+    generatedAt: string;
+}
+
 // ── Weekly Zip Cache types ────────────────────────────────────────────────────
 
 export type BLSRegion = 'Northeast' | 'Midwest' | 'South' | 'West';
