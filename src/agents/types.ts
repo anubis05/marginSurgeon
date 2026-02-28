@@ -6,6 +6,7 @@ export interface Coordinates {
 export interface BaseIdentity {
     name: string;
     address?: string;
+    zipCode?: string;
     coordinates?: Coordinates;
     officialUrl: string;
 }

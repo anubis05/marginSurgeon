@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { SeoAuditorAgent } from '@/agents/seo-auditor/seoAuditor';
 import { generateAndDraftMarketingContent } from '@/agents/marketing-swarm/orchestrator';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 import { BaseIdentity } from '@/agents/types';
 import { Runner, InMemorySessionService } from '@google/adk';

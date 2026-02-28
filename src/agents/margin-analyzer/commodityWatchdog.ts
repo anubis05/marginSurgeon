@@ -3,15 +3,31 @@ import { FunctionTool, LlmAgent } from "@google/adk";
 import { z } from "zod";
 import { CommodityTrend } from '@/lib/types';
 import { callMarketTruthTool } from '../mcpClient';
+import { ZipCacheReader } from '../weekly-cache/zipCacheReader';
 
 const CheckCommoditiesTool = new FunctionTool({
     name: 'check_commodity_inflation',
     description: 'Provide an array of menu item names AND category names (pass both) to check the latest commodity inflation trends from BLS retail price data.',
     parameters: z.object({
-        terms: z.array(z.string()).describe('Mix of menu item names (e.g. "Steak and Eggs") and category names (e.g. "Breakfast", "Poultry") — pass all of them together')
+        terms:   z.array(z.string()).describe('Mix of menu item names (e.g. "Steak and Eggs") and category names (e.g. "Breakfast", "Poultry") — pass all of them together'),
+        zipCode: z.string().optional().describe('5-digit zip code of the business — used to read from weekly cache'),
     }),
-    execute: async ({ terms }) => {
+    execute: async ({ terms, zipCode }) => {
         const trends: CommodityTrend[] = [];
+
+        // ── Weekly cache fast path ────────────────────────────────────────────
+        if (zipCode) {
+            const cached = await ZipCacheReader.getCommodities(zipCode).catch(() => null);
+            if (cached) {
+                console.log(`[CommodityWatchdog] Cache HIT for zip ${zipCode}`);
+                // Map cached snapshots to CommodityTrend format
+                return Object.values(cached).map((snap: any) => ({
+                    ingredient: snap.commodity.toUpperCase(),
+                    inflation_rate_12mo: parseFloat(snap.trend30Day?.replace(/[^0-9.-]/g, '')) || 2.4,
+                    trend_description: `BLS Retail Price: ${snap.pricePerUnit}. 30-day trend: ${snap.trend30Day}. Source: ${snap.source}`,
+                }));
+            }
+        }
 
         // Map item names AND category names to BLS commodity enum: eggs, dairy, beef, poultry
         const commodityMap = new Set<string>();

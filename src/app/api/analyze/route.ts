@@ -11,7 +11,7 @@ import { LocatorAgent } from '@/agents/discovery/locator';
 import { ProfilerAgent } from '@/agents/business-profiler/profiler';
 import { generateAndDraftMarketingContent } from '@/agents/marketing-swarm/orchestrator';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
     try {

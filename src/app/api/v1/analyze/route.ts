@@ -9,7 +9,7 @@ import { MenuItem, MenuAnalysisItem, SurgicalReport } from "@/lib/types";
 import { EnrichedProfile } from '@/agents/types';
 import { generateAndDraftMarketingContent } from '@/agents/marketing-swarm/orchestrator';
 
-export const maxDuration = 60; // 60 seconds (requires Vercel/Cloud Run config)
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
     try {

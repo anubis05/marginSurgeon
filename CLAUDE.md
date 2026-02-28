@@ -16,7 +16,11 @@ There is no test runner command — tests are run via API endpoints in `src/app/
 ## Required Environment Variables
 
 ```
-GEMINI_API_KEY=   # Google Gemini API key (required for all agents)
+GEMINI_API_KEY=       # Google Gemini API key (required for all agents)
+FOURSQUARE_API_KEY=   # Foursquare Places API key (places-intelligence MCP + venueFetcher)
+BLS_API_KEY=          # Bureau of Labor Statistics API key (commodity + macro fetchers)
+FRED_API_KEY=         # FRED (St. Louis Fed) API key (macroFetcher)
+CRON_SECRET=          # Secret token required in x-cron-secret header for /api/cron/*
 ```
 
 Additional variables for Firebase, SerpAPI, and other integrations may be needed depending on the feature being developed.
@@ -45,7 +49,11 @@ Always import models from `config.ts` rather than hardcoding strings.
 
 ### MCP Integration
 
-`src/agents/mcpClient.ts` connects via stdio transport to `mcp-servers/market-truth/build/index.js` — a custom Node.js MCP server that exposes economic data tools (`get_usda_wholesale_prices`, `get_bls_cpi_data`, `get_fred_economic_indicators`). The Benchmarker and CommodityWatchdog agents use this.
+Two MCP servers are available:
+- `src/agents/mcpClient.ts` → `mcp-servers/market-truth/build/index.js` — economic data tools (`get_usda_wholesale_prices`, `get_bls_cpi_data`, `get_fred_economic_indicators`). Used by Benchmarker and CommodityWatchdog.
+- `src/agents/mcpPlacesClient.ts` → `mcp-servers/places-intelligence/build/index.js` — Foursquare venue tools (`get_nearby_venues`, `get_venue_details`). Used by on-demand agents needing live venue data.
+
+The weekly cache agent (`src/agents/weekly-cache/`) calls data-source fetchers directly (no MCP overhead) and writes pre-fetched data to `weekly_zip_cache/{zipCode}` in Firestore.
 
 ### Core User Flow
 
@@ -63,7 +71,7 @@ User query → /api/chat (LocatorAgent, Google Search)
 
 ### API Routes
 
-Long-running routes (`/api/analyze`, `/api/capabilities/*`) set `export const maxDuration = 60` for Vercel deployment.
+Long-running routes (`/api/analyze`, `/api/capabilities/*`, `/api/cron/*`) set `export const maxDuration = 300` (Vercel Pro plan limit). The weekly cron route may need up to 5 minutes for large zip registries.
 
 ### Agent Output Convention
 

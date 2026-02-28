@@ -4,7 +4,7 @@ import { discoveryParallelAgent } from '@/agents/discovery/discoverySubAgents';
 import { Runner, InMemorySessionService } from "@google/adk";
 import { db } from "@/lib/firebase";
 
-export const maxDuration = 60; // Max execution for Serverless Environs
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
     try {

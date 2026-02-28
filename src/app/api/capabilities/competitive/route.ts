@@ -3,7 +3,7 @@ import { Runner, InMemorySessionService } from "@google/adk";
 import { CompetitorProfilerAgent, MarketPositioningAgent } from "@/agents/competitive-analysis/analyzer";
 import { generateAndDraftMarketingContent } from "@/agents/marketing-swarm/orchestrator";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
     try {

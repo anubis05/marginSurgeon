@@ -88,3 +88,167 @@ export interface QuickScanResult {
         description: string;
     }[];
 }
+
+// ── Weekly Zip Cache types ────────────────────────────────────────────────────
+
+export type BLSRegion = 'Northeast' | 'Midwest' | 'South' | 'West';
+
+export interface WeatherDay {
+    date: string;            // YYYY-MM-DD
+    dayOfWeek: string;
+    high: number | null;
+    low: number | null;
+    temperatureUnit: string;
+    shortForecast: string;
+    precipitationChance: number | null;
+    windSpeed: string | null;
+    windDirection: string | null;
+}
+
+export interface WeatherForecast {
+    source: string;
+    forecast: WeatherDay[];
+    error?: string;
+}
+
+export interface EventItem {
+    date: string;            // YYYY-MM-DD or human-readable
+    name: string;
+    venue?: string;
+    category: string;        // 'sports' | 'music' | 'community' | 'festival' | 'other'
+    estimatedAttendance?: 'small' | 'medium' | 'large';
+}
+
+export interface EventsData {
+    items: EventItem[];
+    fetchedAt: string;       // ISO timestamp
+}
+
+export interface VenuePlace {
+    fsq_id: string;
+    name: string;
+    category: string;
+    distance: number;        // metres
+    lat: number;
+    lng: number;
+    popularity?: number;     // Foursquare 0–1
+    address?: string;
+}
+
+export interface VenueData {
+    places: VenuePlace[];
+    fetchedAt: string;
+}
+
+export interface CommoditySnapshot {
+    commodity: string;
+    pricePerUnit: string;
+    trend30Day: string;
+    source: string;
+    fetchedAt: string;
+}
+
+export interface CommoditiesData {
+    eggs: CommoditySnapshot;
+    beef: CommoditySnapshot;
+    poultry: CommoditySnapshot;
+    dairy: CommoditySnapshot;
+}
+
+export interface MacroSnapshot {
+    region: string;
+    cpiYoY: string;
+    foodAwayFromHomeYoY: string;
+    unemployment: string;
+    medianHHI: string;
+    source: string;
+    fetchedAt: string;
+}
+
+// Aggregated raw data stored per zip code
+export interface ZipRawData {
+    weather: WeatherForecast;
+    events: EventsData;
+    venues: VenueData;
+    commodities: CommoditiesData;
+    macroeconomic: MacroSnapshot;
+}
+
+// Synthesized weekly intelligence (LLM-produced)
+export interface TrafficOutlook {
+    overallRating: 'slow' | 'moderate' | 'strong' | 'exceptional';
+    peakDay: string;
+    riskWindows: string[];
+    boostWindows: string[];
+    keyDrivers: string[];
+    weeklyHeadline: string;
+}
+
+export interface CommodityAlert {
+    commodity: string;
+    severity: 'info' | 'warning' | 'critical';
+    inflationRate: number;
+    suggestedPriceAdjustment: string;
+    affectedMenuCategories: string[];
+    actionBullet: string;
+}
+
+export interface EconomicContext {
+    consumerPressure: 'low' | 'moderate' | 'high';
+    priceIncreaseSafety: 'safe_large' | 'safe_small' | 'cautious' | 'avoid';
+    unemploymentRate: number;
+    cpiYoY: number;
+    headline: string;
+}
+
+export interface CompetitorLandscape {
+    totalVenuesInRadius: number;
+    saturationLevel: 'low' | 'medium' | 'high';
+    dominantCuisines: string[];
+    whiteSpaceOpportunities: string[];
+    averagePricePoint: string;
+    threatLevel: 'low' | 'medium' | 'high';
+    headline: string;
+}
+
+export interface WeeklySynthesis {
+    zipCode: string;
+    weekOf: string;          // ISO date of the Monday of this week
+    synthesizedAt: string;
+    trafficOutlook: TrafficOutlook;
+    commodityAlerts: CommodityAlert[];
+    economicContext: EconomicContext;
+    competitorLandscape: CompetitorLandscape;
+    weeklyBullets: string[];
+    agentHints: {
+        forecaster: string;
+        surgeon: string;
+        advisor: string;
+        seo: string;
+    };
+}
+
+export interface ZipWeeklyCache {
+    meta: {
+        zipCode: string;
+        lat: number;
+        lng: number;
+        region: BLSRegion;
+        schemaVersion: number;
+        refreshedAt: string;   // ISO timestamp
+        expiresAt: string;     // ISO timestamp (refreshedAt + 7 days)
+    };
+    raw: ZipRawData;
+    synthesis: WeeklySynthesis;
+}
+
+export interface ZipRegistryEntry {
+    zipCode: string;
+    lat: number;
+    lng: number;
+    region: BLSRegion;
+    isActive: boolean;
+    businessCount: number;
+    addedAt: string;
+    lastRefreshedAt?: string;
+}

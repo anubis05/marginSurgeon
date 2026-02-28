@@ -3,7 +3,7 @@ import { ForecasterAgent } from '@/agents/traffic-forecaster/forecaster';
 
 import { generateAndDraftMarketingContent } from "@/agents/marketing-swarm/orchestrator";
 
-export const maxDuration = 60; // 60 seconds (requires Vercel/Cloud Run config but good practice)
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
     try {
