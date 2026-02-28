@@ -3,6 +3,27 @@ import { discoveryParallelAgent } from '@/agents/discovery/discoverySubAgents';
 import { BaseIdentity, EnrichedProfile } from '@/agents/types';
 import { Runner, InMemorySessionService } from "@google/adk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { db } from '@/lib/firebase';
+
+export const maxDuration = 300;
+
+/** Slug used as the Firestore document ID: lower-case, underscores, no special chars */
+function slugify(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+/** Parse a JSON string produced by an LLM — handles markdown fences gracefully */
+function safeParse<T>(raw: unknown, label: string): T | null {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw === 'object') return raw as T;
+    if (typeof raw !== 'string') return null;
+    try {
+        return JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim()) as T;
+    } catch (e) {
+        console.warn(`[API/Discover] Could not parse ${label}:`, e);
+        return null;
+    }
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -32,9 +53,9 @@ export async function POST(req: NextRequest) {
         });
 
         const prompt = `
-            Please discover the menu, social links, Google Maps URL, and exactly 3 local competitors for:
+            Please discover the menu, social links, contact info, Google Maps URL, and exactly 3 local competitors for:
             Name: ${identity.name}
-            Address: ${identity.address}
+            Address: ${identity.address ?? 'Unknown'}
             URL: ${identity.officialUrl}
         `;
 
@@ -52,47 +73,67 @@ export async function POST(req: NextRequest) {
 
         console.log("[API/Discover] ADK Pipeline Finished. State keys:", Object.keys(state));
 
-        // Safely parse social links if Gemini included markdown
-        let parsedSocials = {};
-        if (typeof state.socialLinks === 'string') {
-            try {
-                const cleanStr = state.socialLinks.replace(/```json/g, '').replace(/```/g, '').trim();
-                parsedSocials = JSON.parse(cleanStr);
-            } catch (e) {
-                console.warn("[API/Discover] Failed to parse social links JSON:", e);
-            }
-        } else if (typeof state.socialLinks === 'object') {
-            parsedSocials = state.socialLinks as any;
-        }
+        // ── Parse social links ───────────────────────────────────────────────
+        const parsedSocials = safeParse<EnrichedProfile['socialLinks']>(state.socialLinks, 'socialLinks') ?? {};
 
-        // Safely parse competitors if Gemini included markdown
-        let parsedCompetitors = [];
-        if (typeof state.competitors === 'string') {
-            try {
-                const cleanStr = state.competitors.replace(/```json/g, '').replace(/```/g, '').trim();
-                parsedCompetitors = JSON.parse(cleanStr);
-            } catch (e) {
-                console.warn("[API/Discover] Failed to parse competitors JSON explicitly, running intelligent extraction...");
+        // ── Parse contact info ───────────────────────────────────────────────
+        const parsedContactInfo = safeParse<EnrichedProfile['contactInfo']>(state.contactInfo, 'contactInfo') ?? undefined;
+
+        // ── Parse competitors (with LLM fallback extraction) ─────────────────
+        let parsedCompetitors: EnrichedProfile['competitors'] = [];
+        const rawCompetitors = state.competitors;
+
+        if (Array.isArray(rawCompetitors)) {
+            parsedCompetitors = rawCompetitors;
+        } else if (typeof rawCompetitors === 'string') {
+            const attempt = safeParse<any[]>(rawCompetitors, 'competitors');
+            if (attempt) {
+                parsedCompetitors = attempt;
+            } else {
+                console.warn("[API/Discover] Competitors JSON parse failed — attempting forced Gemini extraction...");
                 try {
                     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-                    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
-                    const res = await model.generateContent(`Extract exactly 3 restaurant competitors from the following text into a JSON array of objects with strictly these keys: "name", "url", "reason". TEXT: ${state.competitors}`);
+                    const model = genAI.getGenerativeModel({
+                        model: "gemini-2.5-flash",
+                        generationConfig: { responseMimeType: "application/json" }
+                    });
+                    const res = await model.generateContent(
+                        `Extract exactly 3 local competitors from the following text into a JSON array.
+                        Each object must have: "name", "url", "address", "phone", "cuisineType", "priceRange", "reason".
+                        Return ONLY the JSON array.
+                        TEXT: ${rawCompetitors}`
+                    );
                     parsedCompetitors = JSON.parse(res.response.text());
                 } catch (extractErr) {
                     console.error("[API/Discover] Forced extraction failed", extractErr);
                 }
             }
-        } else if (Array.isArray(state.competitors)) {
-            parsedCompetitors = state.competitors;
         }
 
+        // ── Assemble enriched profile ────────────────────────────────────────
         const enrichedProfile: EnrichedProfile = {
             ...identity,
             menuScreenshotBase64: state.menuScreenshotBase64 as string | undefined,
-            socialLinks: parsedSocials,
-            googleMapsUrl: state.googleMapsUrl as string | undefined,
-            competitors: parsedCompetitors.length > 0 ? parsedCompetitors : undefined
+            socialLinks: Object.keys(parsedSocials ?? {}).length > 0 ? parsedSocials : undefined,
+            contactInfo: parsedContactInfo,
+            googleMapsUrl: typeof state.googleMapsUrl === 'string' && state.googleMapsUrl.startsWith('http')
+                ? state.googleMapsUrl
+                : undefined,
+            competitors: parsedCompetitors && parsedCompetitors.length > 0 ? parsedCompetitors : undefined,
+            discoveredAt: new Date().toISOString(),
         };
+
+        // ── Persist to Firestore profiles/{slug} ─────────────────────────────
+        try {
+            const slug = slugify(identity.name);
+            // Strip the large base64 screenshot before storing — keep profile lean
+            const { menuScreenshotBase64: _screenshot, ...profileToStore } = enrichedProfile;
+            await db.collection('profiles').doc(slug).set(profileToStore, { merge: true });
+            console.log(`[API/Discover] Profile saved to Firestore profiles/${slug}`);
+        } catch (fsErr) {
+            // Non-fatal — profile write failure should not fail the response
+            console.error("[API/Discover] Firestore profile write failed:", fsErr);
+        }
 
         return NextResponse.json(enrichedProfile);
 

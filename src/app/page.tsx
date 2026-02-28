@@ -10,10 +10,11 @@ import DetailPanel from '@/components/Chatbot/DetailPanel';
 import MapVisualizer from '@/components/Chatbot/MapVisualizer';
 import HeatmapGrid from '@/components/Chatbot/HeatmapGrid';
 import { ChatMessage, ForecastResponse } from '@/components/Chatbot/types';
-import { BaseIdentity } from '@/agents/types';
+import { BaseIdentity, EnrichedProfile } from '@/agents/types';
 import { NeuralBackground } from '@/components/Chatbot/NeuralBackground';
 import { EmailWall } from '@/components/Chatbot/EmailWall';
 import ResultsDashboard from '@/components/Chatbot/seo/ResultsDashboard';
+import ProfileCard from '@/components/Chatbot/ProfileCard';
 import { SeoReport } from '@/lib/types';
 
 export default function Home() {
@@ -585,7 +586,12 @@ export default function Home() {
                 <ResultsDashboard report={seoReport} groundingChunks={(seoReport as any).groundingChunks || []} />
               </div>
             ) : locatedBusiness && locatedBusiness.coordinates ? (
-              <MapVisualizer lat={locatedBusiness.coordinates.lat} lng={locatedBusiness.coordinates.lng} businessName={locatedBusiness.name} business={locatedBusiness} isDiscovering={isDiscovering} />
+              <div className="relative w-full h-full">
+                <MapVisualizer lat={locatedBusiness.coordinates.lat} lng={locatedBusiness.coordinates.lng} businessName={locatedBusiness.name} business={locatedBusiness} isDiscovering={isDiscovering} />
+                {!isDiscovering && (locatedBusiness as EnrichedProfile).discoveredAt && (
+                  <ProfileCard profile={locatedBusiness as EnrichedProfile} />
+                )}
+              </div>
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-transparent mt-16 px-4">
                 {/* Fallback space when left panel is active but no content is loaded */}

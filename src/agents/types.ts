@@ -11,22 +11,43 @@ export interface BaseIdentity {
     officialUrl: string;
 }
 
+export interface ContactInfo {
+    email?: string;
+    phone?: string;
+    hours?: string;
+}
+
+export interface SocialLinks {
+    instagram?: string;
+    facebook?: string;
+    twitter?: string;
+    tiktok?: string;
+    youtube?: string;
+    linkedin?: string;
+    yelp?: string;
+    googleBusiness?: string;
+}
+
+export interface CompetitorEntry {
+    name: string;
+    url: string;
+    address?: string;
+    phone?: string;
+    cuisineType?: string;
+    priceRange?: string;
+    reason?: string;
+}
+
 export interface EnrichedProfile extends BaseIdentity {
     primaryColor?: string;
     secondaryColor?: string;
     logoUrl?: string;
     persona?: string;
     menuScreenshotBase64?: string;
-    socialLinks?: {
-        instagram?: string;
-        facebook?: string;
-        twitter?: string;
-    };
+    contactInfo?: ContactInfo;
+    socialLinks?: SocialLinks;
     googleMapsUrl?: string;
-    competitors?: {
-        name: string;
-        url: string;
-        reason?: string;
-    }[];
+    competitors?: CompetitorEntry[];
+    discoveredAt?: string;
     _debugError?: string;
 }
