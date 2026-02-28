@@ -17,3 +17,8 @@ export const AgentModels = {
     // Visual Creative Model: explicitly tuned for generating image and infographic prompts
     CREATIVE_VISION_MODEL: 'gemini-3-pro-image-preview',
 } as const;
+
+export const StorageConfig = {
+    BUCKET: 'everything-hephae',
+    BASE_URL: 'https://storage.googleapis.com/everything-hephae',
+} as const;

@@ -32,6 +32,14 @@ export default function Home() {
   const [seoReport, setSeoReport] = useState<SeoReport | null>(null);
   const [competitiveReport, setCompetitiveReport] = useState<any | null>(null);
 
+  // Report share URLs
+  const [profileReportUrl, setProfileReportUrl] = useState<string | null>(null);
+  const [marginReportUrl, setMarginReportUrl] = useState<string | null>(null);
+  const [trafficReportUrl, setTrafficReportUrl] = useState<string | null>(null);
+  const [seoReportUrl, setSeoReportUrl] = useState<string | null>(null);
+  const [competitiveReportUrl, setCompetitiveReportUrl] = useState<string | null>(null);
+  const [copyToast, setCopyToast] = useState(false);
+
   // Detail Panel State for Traffic Forecast Phase 14
   const [selectedDay, setSelectedDay] = useState<DailyForecast | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
@@ -120,7 +128,12 @@ export default function Home() {
         setForecast(null);
         setSeoReport(null);
         setCompetitiveReport(null);
-        setCapabilities([]); // Clear capabilities initially
+        setCapabilities([]);
+        setProfileReportUrl(null);
+        setMarginReportUrl(null);
+        setTrafficReportUrl(null);
+        setSeoReportUrl(null);
+        setCompetitiveReportUrl(null);
 
         // Spawn Background Discovery
         triggerDiscoveryOrchestrator(data.locatedBusiness);
@@ -144,6 +157,7 @@ export default function Home() {
       });
       if (res.ok) {
         const enrichedProfile = await res.json();
+        if (enrichedProfile.reportUrl) setProfileReportUrl(enrichedProfile.reportUrl);
         setLocatedBusiness(enrichedProfile); // Update to enriched profile
         setCapabilities([
           { id: 'surgery', label: 'Analyze Menu Margins' },
@@ -209,6 +223,7 @@ export default function Home() {
 
         const data = await res.json();
         setReport(data);
+        if (data.reportUrl) setMarginReportUrl(data.reportUrl);
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: "Surgery complete. The surgical dashboard has been rendered." }]);
 
       } catch (e: any) {
@@ -236,6 +251,7 @@ export default function Home() {
 
         const data = await res.json();
         setForecast(data);
+        if (data.reportUrl) setTrafficReportUrl(data.reportUrl);
 
         if (data.forecast?.length) {
           const firstDay = data.forecast[0];
@@ -270,6 +286,7 @@ export default function Home() {
 
         const data = await res.json();
         setSeoReport(data);
+        if (data.reportUrl) setSeoReportUrl(data.reportUrl);
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: `SEO Audit complete! Verified ${data.sections?.length || 0} critical infrastructure categories.` }]);
 
       } catch (e: any) {
@@ -302,6 +319,7 @@ export default function Home() {
 
         const data = await res.json();
         setCompetitiveReport(data);
+        if (data.reportUrl) setCompetitiveReportUrl(data.reportUrl);
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', text: `Competitive Strategy complete! ${data.market_summary}` }]);
 
       } catch (e: any) {
@@ -311,6 +329,15 @@ export default function Home() {
       }
     }
   };
+
+  const copyReportUrl = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopyToast(true);
+      setTimeout(() => setCopyToast(false), 2500);
+    });
+  };
+
+  const activeReportUrl = marginReportUrl || trafficReportUrl || seoReportUrl || competitiveReportUrl || profileReportUrl;
 
   const downloadSocialCard = async () => {
     if (!report) return;
@@ -535,6 +562,13 @@ export default function Home() {
       <div className={`relative z-10 transition-all duration-700 ease-in-out flex flex-col ${isCentered ? 'w-0 opacity-0 overflow-hidden' : 'flex-1 opacity-100'}`}>
         {!isCentered && (
           <>
+            {/* Copy-link toast */}
+            {copyToast && (
+              <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl border border-white/10 animate-fade-in-up pointer-events-none">
+                Link copied!
+              </div>
+            )}
+
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 animate-fade-in-up pointer-events-auto bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-gray-200/80">
               <button onClick={() => handleSelectCapability("surgery")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-600 hover:text-indigo-600 hover:bg-indigo-50/80 transition-all group">
                 <BarChart3 className="w-3.5 h-3.5 text-indigo-500 group-hover:scale-110 transition-transform" />
@@ -568,6 +602,19 @@ export default function Home() {
                 <Share2 className="w-3.5 h-3.5 text-pink-500 group-hover:scale-110 transition-transform" />
                 Social Media
               </button>
+
+              {activeReportUrl && (
+                <>
+                  <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                  <button
+                    onClick={() => copyReportUrl(activeReportUrl)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-all group border border-indigo-200"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-indigo-500 group-hover:scale-110 transition-transform" />
+                    Share Report
+                  </button>
+                </>
+              )}
             </div>
 
             {report ? (
@@ -592,7 +639,7 @@ export default function Home() {
       </div>
 
       {/* RIGHT CHATBOT PANEL - Full screen when centered, narrow sidebar when active */}
-      <div className={`relative z-20 flex-shrink-0 transition-all duration-700 ease-in-out h-full ${isCentered ? 'w-full max-w-none' : 'w-[340px]'}`}>
+      <div className={`relative z-20 flex-shrink-0 transition-all duration-700 ease-in-out h-full ${isCentered ? 'w-full max-w-none' : 'w-[480px]'}`}>
         <ChatInterface
           messages={messages}
           onSendMessage={sendMessage}
@@ -603,8 +650,14 @@ export default function Home() {
             setReport(null);
             setForecast(null);
             setSeoReport(null);
+            setCompetitiveReport(null);
             setCapabilities([]);
             setIsDiscovering(false);
+            setProfileReportUrl(null);
+            setMarginReportUrl(null);
+            setTrafficReportUrl(null);
+            setSeoReportUrl(null);
+            setCompetitiveReportUrl(null);
           }}
           capabilities={capabilities}
           onSelectCapability={handleSelectCapability}

@@ -10,6 +10,8 @@ import { EnrichedProfile } from '@/agents/types';
 import { LocatorAgent } from '@/agents/discovery/locator';
 import { ProfilerAgent } from '@/agents/business-profiler/profiler';
 import { generateAndDraftMarketingContent } from '@/agents/marketing-swarm/orchestrator';
+import { saveReport, generateSlug } from '@/lib/reportStorage';
+import { buildMarginReport } from '@/lib/reportTemplates';
 
 export const maxDuration = 60;
 
@@ -219,7 +221,17 @@ export async function POST(req: NextRequest) {
         // Fire and forget the marketing pipeline
         generateAndDraftMarketingContent(report, 'Margin Surgery').catch(console.error);
 
-        return NextResponse.json(report);
+        const totalLeakage = report.menu_items.reduce((s, i) => s + i.price_leakage, 0);
+        const slug = generateSlug(finalIdentity.name);
+        const reportUrl = await saveReport({
+            slug,
+            type: 'margin',
+            htmlContent: buildMarginReport(report),
+            identity: finalIdentity,
+            summary: `$${totalLeakage.toLocaleString()} profit leakage detected. Score: ${score}/100`,
+        });
+
+        return NextResponse.json({ ...report, reportUrl: reportUrl || undefined });
 
     } catch (error) {
         console.error("Orchestration Failed:", error);

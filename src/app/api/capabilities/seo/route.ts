@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { SeoAuditorAgent } from '@/agents/seo-auditor/seoAuditor';
 import { generateAndDraftMarketingContent } from '@/agents/marketing-swarm/orchestrator';
+import { saveReport, generateSlug } from '@/lib/reportStorage';
+import { buildSeoReport } from '@/lib/reportTemplates';
 
 export const maxDuration = 60;
 
@@ -77,7 +79,16 @@ export async function POST(req: Request) {
         // Fire and forget marketing generation
         generateAndDraftMarketingContent({ identity, seo: finalReport }, 'SEO Deep Audit').catch(console.error);
 
-        return NextResponse.json(finalReport);
+        const slug = generateSlug(identity.name || identity.officialUrl);
+        const reportUrl = await saveReport({
+            slug,
+            type: 'seo',
+            htmlContent: buildSeoReport(finalReport),
+            identity,
+            summary: finalReport.summary || `SEO score: ${finalReport.overallScore}/100`,
+        });
+
+        return NextResponse.json({ ...finalReport, reportUrl: reportUrl || undefined });
     } catch (e: any) {
         console.error("[SEO API Error]:", e);
         return NextResponse.json({ error: e.message }, { status: 500 });

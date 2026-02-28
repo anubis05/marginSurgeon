@@ -3,6 +3,8 @@ import { discoveryParallelAgent } from '@/agents/discovery/discoverySubAgents';
 import { BaseIdentity, EnrichedProfile } from '@/agents/types';
 import { Runner, InMemorySessionService } from "@google/adk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { saveReport, generateSlug } from '@/lib/reportStorage';
+import { buildProfileReport } from '@/lib/reportTemplates';
 
 export async function POST(req: NextRequest) {
     try {
@@ -86,15 +88,46 @@ export async function POST(req: NextRequest) {
             parsedCompetitors = state.competitors;
         }
 
+        // Clean menu base64 — agent may prefix with conversational text or echo tool JSON
+        let menuBase64 = state.menuScreenshotBase64 as string | undefined;
+        if (menuBase64) {
+            try {
+                const parsed = JSON.parse(menuBase64);
+                if (parsed.screenshotBase64) menuBase64 = parsed.screenshotBase64;
+            } catch {
+                // Not JSON — strip any leading text, keeping only the base64 payload
+                const base64Match = menuBase64.match(/[A-Za-z0-9+/]{200,}={0,2}/);
+                if (base64Match) menuBase64 = base64Match[0];
+            }
+        }
+
+        const socials = parsedSocials as any;
         const enrichedProfile: EnrichedProfile = {
             ...identity,
-            menuScreenshotBase64: state.menuScreenshotBase64 as string | undefined,
-            socialLinks: parsedSocials,
+            menuScreenshotBase64: menuBase64,
+            socialLinks: {
+                instagram: socials.instagram || undefined,
+                facebook: socials.facebook || undefined,
+                twitter: socials.twitter || undefined,
+            },
+            phone: socials.phone || undefined,
+            email: socials.email || undefined,
+            hours: socials.hours || undefined,
             googleMapsUrl: state.googleMapsUrl as string | undefined,
             competitors: parsedCompetitors.length > 0 ? parsedCompetitors : undefined
         };
 
-        return NextResponse.json(enrichedProfile);
+        const slug = generateSlug(enrichedProfile.name);
+        const reportUrl = await saveReport({
+            slug,
+            type: 'profile',
+            htmlContent: buildProfileReport(enrichedProfile),
+            identity: enrichedProfile,
+            summary: `Business profile for ${enrichedProfile.name}`,
+            rawData: enrichedProfile,
+        });
+
+        return NextResponse.json({ ...enrichedProfile, reportUrl: reportUrl || undefined });
 
     } catch (error) {
         console.error("[API/Discover] Orchestration Failed:", error);
