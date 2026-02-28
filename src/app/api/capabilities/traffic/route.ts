@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ForecasterAgent } from '@/agents/traffic-forecaster/forecaster';
 
 import { generateAndDraftMarketingContent } from "@/agents/marketing-swarm/orchestrator";
+import { exportReport } from "@/lib/reportExporter";
 
 export const maxDuration = 300;
 
@@ -16,10 +17,12 @@ export async function POST(req: NextRequest) {
 
         const forecastData = await ForecasterAgent.forecast(identity);
 
-        // Fire and forget marketing generation
-        generateAndDraftMarketingContent({ identity, forecast: forecastData }, 'Foot Traffic Heatmap').catch(console.error);
+        const exported = await exportReport('traffic', forecastData, { businessName: identity.name }).catch(() => null);
+        const reportUrl = exported?.publicUrl;
 
-        return NextResponse.json(forecastData);
+        generateAndDraftMarketingContent({ identity, forecast: forecastData }, 'Foot Traffic Heatmap', reportUrl).catch(console.error);
+
+        return NextResponse.json({ ...forecastData, reportUrl });
 
     } catch (error: any) {
         console.error("[API/Capabilities/Traffic] Failed:", error);

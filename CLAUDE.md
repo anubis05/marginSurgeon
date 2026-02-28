@@ -21,6 +21,7 @@ FOURSQUARE_API_KEY=   # Foursquare Places API key (places-intelligence MCP + ven
 BLS_API_KEY=          # Bureau of Labor Statistics API key (commodity + macro fetchers)
 FRED_API_KEY=         # FRED (St. Louis Fed) API key (macroFetcher)
 CRON_SECRET=          # Secret token required in x-cron-secret header for /api/cron/*
+GCS_REPORT_BUCKET=    # GCS bucket for interactive HTML report exports (e.g. hephae-co.appspot.com)
 ```
 
 Additional variables for Firebase, SerpAPI, and other integrations may be needed depending on the feature being developed.

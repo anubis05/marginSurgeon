@@ -10,6 +10,7 @@ import { EnrichedProfile } from '@/agents/types';
 import { LocatorAgent } from '@/agents/discovery/locator';
 import { ProfilerAgent } from '@/agents/business-profiler/profiler';
 import { generateAndDraftMarketingContent } from '@/agents/marketing-swarm/orchestrator';
+import { exportReport } from '@/lib/reportExporter';
 
 export const maxDuration = 300;
 
@@ -217,9 +218,13 @@ export async function POST(req: NextRequest) {
         };
 
         // Fire and forget the marketing pipeline
-        generateAndDraftMarketingContent(report, 'Margin Surgery').catch(console.error);
+        // Export interactive HTML report to GCS (fire-and-forget; returns URL when done)
+        const exported = await exportReport('surgery', report, { businessName: finalIdentity.name }).catch(() => null);
+        const reportUrl = exported?.publicUrl;
 
-        return NextResponse.json(report);
+        generateAndDraftMarketingContent(report, 'Margin Surgery', reportUrl).catch(console.error);
+
+        return NextResponse.json({ ...report, reportUrl });
 
     } catch (error) {
         console.error("Orchestration Failed:", error);

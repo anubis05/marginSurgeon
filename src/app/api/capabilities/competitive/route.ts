@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Runner, InMemorySessionService } from "@google/adk";
 import { CompetitorProfilerAgent, MarketPositioningAgent } from "@/agents/competitive-analysis/analyzer";
 import { generateAndDraftMarketingContent } from "@/agents/marketing-swarm/orchestrator";
+import { exportReport } from "@/lib/reportExporter";
 
 export const maxDuration = 300;
 
@@ -69,10 +70,12 @@ export async function POST(req: NextRequest) {
 
         console.log("[API/Competitive] Success:", payload);
 
-        // Fire and forget marketing generation
-        generateAndDraftMarketingContent({ identity, competitive: payload }, 'Competitive Strategy').catch(console.error);
+        const exported = await exportReport('competitive', { identity, competitive: payload }, { businessName: identity.name }).catch(() => null);
+        const reportUrl = exported?.publicUrl;
 
-        return NextResponse.json(payload);
+        generateAndDraftMarketingContent({ identity, competitive: payload }, 'Competitive Strategy', reportUrl).catch(console.error);
+
+        return NextResponse.json({ ...payload, reportUrl });
     } catch (e: any) {
         console.error("Competitive check failed", e);
         return NextResponse.json({ error: e.message || "Failed to analyze competitors." }, { status: 500 });
