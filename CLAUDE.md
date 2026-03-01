@@ -71,3 +71,12 @@ Always parse and store `zipCode` as an explicit top-level field — never derive
 
 ### Firestore document size
 The `businesses/{slug}` top-level document must never contain arrays that grow over time (no `reports[]`, no `analyses[]`). All historical data lives in BigQuery. Firestore stores only current state via `latestOutputs.{agentName}` map keys.
+
+### Keep `ADMIN_APP_API.md` in sync
+`ADMIN_APP_API.md` is the external contract for the Hephae Admin App. When you change any of the following, you MUST update `ADMIN_APP_API.md` in the same commit:
+- API request/response shapes (any route under `src/app/api/`)
+- Firestore document schema (`businesses/{slug}`, `hub_searches/{id}`)
+- BigQuery table columns (`analyses`, `discoveries`, `interactions`)
+- TypeScript interfaces in `src/agents/types.ts` or `src/lib/types.ts`
+- Agent registry entries or version keys in `src/agents/config.ts`
+- GCS path conventions in `src/lib/reportStorage.ts`
