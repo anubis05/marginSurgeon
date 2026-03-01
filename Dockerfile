@@ -1,54 +1,69 @@
-FROM node:20-bookworm-slim AS base
+# ───────────────────────────────────────────────────────────
+# Multi-stage Dockerfile: Next.js (port 3000) + FastAPI (port 8000)
+# Uses supervisord to run both processes in a single container.
+# ───────────────────────────────────────────────────────────
 
-# 1. Install dependencies only when needed
-FROM base AS deps
+# --- Stage 1: Node.js dependencies ---
+FROM node:20-bookworm-slim AS node-deps
 WORKDIR /app
-
-# Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --omit=dev
 
-# 2. Rebuild the source code only when needed
-FROM base AS builder
+# --- Stage 2: Next.js build ---
+FROM node:20-bookworm-slim AS nextjs-builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=node-deps /app/node_modules ./node_modules
 COPY . .
-
-# Environment variables must be present at build time if used in static generation
-# ENV GEMINI_API_KEY="placeholder_if_static_gen_needs_it"
-
 RUN npm run build
 
-# 3. Production image, copy all the files and run next
-FROM mcr.microsoft.com/playwright:v1.58.1-jammy AS runner
+# --- Stage 3: Python dependencies ---
+FROM python:3.12-slim-bookworm AS python-deps
+WORKDIR /app
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir --target=/pylibs ".[all]"
+
+# --- Stage 4: Combined runner (Playwright base for browser support) ---
+FROM mcr.microsoft.com/playwright/python:v1.49.1-noble AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED=1
+ENV PYTHONPATH=/app:/pylibs
+ENV PATH="/pylibs/bin:$PATH"
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Install Node.js 20 + supervisord
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl supervisor && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/public ./public
+# Create app user
+RUN addgroup --system --gid 1001 appuser && \
+    adduser --system --uid 1001 --ingroup appuser appuser
 
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+# Copy Python libraries
+COPY --from=python-deps /pylibs /pylibs
 
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/.env.local ./
+# Copy Next.js standalone build
+COPY --from=nextjs-builder /app/public ./public
+RUN mkdir -p .next && chown appuser:appuser .next
+COPY --from=nextjs-builder --chown=appuser:appuser /app/.next/standalone ./
+COPY --from=nextjs-builder --chown=appuser:appuser /app/.next/static ./.next/static
 
+# Copy Python backend
+COPY --chown=appuser:appuser backend/ ./backend/
 
-USER nextjs
+# Copy supervisord config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Copy .env.local if it exists (non-fatal if missing)
+COPY --chown=appuser:appuser .env.local* ./
+
+USER appuser
+
+# Cloud Run sends traffic to PORT (default 3000)
 EXPOSE 3000
-
+EXPOSE 8000
 ENV PORT=3000
-# set hostname to localhost
-ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -1,0 +1,18 @@
+"""
+Shared tools used by 3+ agent groups.
+
+Re-exports raw functions and pre-wrapped FunctionTool instances so agent
+modules can do:
+
+    from backend.agents.shared_tools import google_search_tool, playwright_tool, crawl4ai_tool
+"""
+
+from google.adk.tools import FunctionTool
+
+from backend.agents.shared_tools.google_search import google_search
+from backend.agents.shared_tools.playwright import crawl_web_page
+from backend.agents.shared_tools.crawl4ai import crawl_for_content
+
+google_search_tool = FunctionTool(func=google_search)
+playwright_tool = FunctionTool(func=crawl_web_page)
+crawl4ai_tool = FunctionTool(func=crawl_for_content)

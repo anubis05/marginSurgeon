@@ -1,5 +1,5 @@
 import React from 'react';
-import { Recommendation } from '@/lib/types';
+import { Recommendation } from '@/types/api';
 import { AlertCircle, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { SEVERITY_COLORS } from './constants';
 
@@ -31,10 +31,12 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ item }) => {
         </span>
       </div>
       <p className="text-gray-600 text-sm mb-3">{item.description}</p>
-      <div className="bg-slate-50 p-3 rounded text-sm text-slate-700 border border-slate-100">
-        <span className="font-semibold text-slate-900 mr-1">Fix:</span>
-        {item.action}
-      </div>
+      {item.action && (
+        <div className="bg-slate-50 p-3 rounded text-sm text-slate-700 border border-slate-100">
+          <span className="font-semibold text-slate-900 mr-1">Fix:</span>
+          {item.action}
+        </div>
+      )}
     </div>
   );
 };

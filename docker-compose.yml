@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    env_file:
+      - .env.local
+    depends_on:
+      - crawl4ai
+    environment:
+      - CRAWL4AI_URL=http://crawl4ai:11235
+
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    ports:
+      - "11235:11235"

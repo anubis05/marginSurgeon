@@ -10,8 +10,8 @@
 # Local development
 http://localhost:3000
 
-# Production (Cloud Run) — update when deployed
-# https://<TBD>.run.app
+# Production (Cloud Run)
+https://hephae-forge-1096334123076.us-east1.run.app
 ```
 
 ---
@@ -33,6 +33,7 @@ http://localhost:3000
 | `GEMINI_API_KEY` | Yes      | Google AI Studio key — powers all agents       |
 | `BLS_API_KEY`    | No       | Live BLS commodity + CPI data (has fallbacks)  |
 | `FRED_API_KEY`   | No       | Live FRED economic indicators (has fallbacks)  |
+| `CRAWL4AI_URL`   | No       | crawl4ai REST endpoint (default: `http://localhost:11235`) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Yes (server) | ADC for Firebase Admin + BigQuery |
 
 ---
@@ -185,7 +186,7 @@ One row per discovery run. Written by `writeDiscovery()`.
 | `lat`             | FLOAT     | Latitude, nullable                              |
 | `lng`             | FLOAT     | Longitude, nullable                             |
 | `agent_name`      | STRING    | Always `discovery_orchestrator`                 |
-| `agent_version`   | STRING    | From `AgentVersions.MENU_DISCOVERY`             |
+| `agent_version`   | STRING    | From `AgentVersions.DISCOVERY_PIPELINE`         |
 | `run_at`          | TIMESTAMP | When discovery ran                              |
 | `triggered_by`    | STRING    | `user`, `weekly_job`, or `api_v1`               |
 | `raw_data`        | STRING    | Full enriched profile JSON (blobs stripped)     |
@@ -484,11 +485,14 @@ Defined in `src/agents/config.ts`.
 
 | Agent Name              | Version Key              | Model Tier    | BQ `agent_name`          |
 |-------------------------|--------------------------|---------------|--------------------------|
-| Menu Discovery          | `MENU_DISCOVERY`         | Flash         | `discovery_orchestrator` |
-| Social Discovery        | `SOCIAL_DISCOVERY`       | Flash         | (sub-agent)              |
-| Maps Discovery          | `MAPS_DISCOVERY`         | Flash         | (sub-agent)              |
-| Competitor Discovery    | `COMPETITOR_DISCOVERY`   | Flash         | (sub-agent)              |
-| Theme Discovery         | `THEME_DISCOVERY`        | Flash         | (sub-agent)              |
+| Discovery Pipeline      | `DISCOVERY_PIPELINE`     | Sequential    | `discovery_orchestrator` |
+| Site Crawler            | `SITE_CRAWLER`           | Flash         | (sub-agent, Stage 1)     |
+| Contact Discovery       | `CONTACT_DISCOVERY`      | Flash         | (sub-agent, Stage 2)     |
+| Menu Discovery          | `MENU_DISCOVERY`         | Flash         | (sub-agent, Stage 2)     |
+| Social Discovery        | `SOCIAL_DISCOVERY`       | Flash         | (sub-agent, Stage 2)     |
+| Maps Discovery          | `MAPS_DISCOVERY`         | Flash         | (sub-agent, Stage 2)     |
+| Competitor Discovery    | `COMPETITOR_DISCOVERY`   | Pro           | (sub-agent, Stage 2)     |
+| Theme Discovery         | `THEME_DISCOVERY`        | Flash         | (sub-agent, Stage 2)     |
 | Margin Surgeon          | `MARGIN_SURGEON`         | Pro           | `margin_surgeon`         |
 | SEO Auditor             | `SEO_AUDITOR`            | Pro           | `seo_auditor`            |
 | Traffic Forecaster      | `TRAFFIC_FORECASTER`     | Flash         | `traffic_forecaster`     |

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 
-import { BaseIdentity, EnrichedProfile } from '@/agents/types';
+import { BaseIdentity, EnrichedProfile } from '@/types/api';
+import DiscoveryProgress from './DiscoveryProgress';
 
 interface MapVisualizerProps {
     lat: number;
@@ -14,32 +15,23 @@ interface MapVisualizerProps {
 
 type ActiveTab = 'profile' | 'theme' | 'contact' | 'social' | 'menu' | 'competitors';
 
-const LoadingDots = ({ label }: { label: string }) => (
-    <div className="flex flex-col items-center justify-center h-full space-y-2 py-4">
-        <div className="flex space-x-1">
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }}></div>
-        </div>
-        <p className="text-slate-400 text-sm">{label}</p>
-    </div>
-);
-
 export default function MapVisualizer({ lat, lng, businessName, business, isDiscovering = false }: MapVisualizerProps) {
     const [zoomLevel, setZoomLevel] = useState<number>(15);
     const [resetKey, setResetKey] = useState(0);
     const [activeTab, setActiveTab] = useState<ActiveTab>('profile');
-    const [menuImgError, setMenuImgError] = useState(false);
     const [logoError, setLogoError] = useState(false);
 
     const getUrl = () => {
-        const baseEmbed = `https://maps.google.com/maps?ie=UTF8&iwloc=&output=embed`;
-        return `${baseEmbed}&z=${zoomLevel}&q=${lat},${lng}&t=m`;
+        // Google Maps embed — no API key needed for this format, avoids 403 referrer issues
+        const query = business?.address
+            ? `${businessName}, ${business.address}`
+            : `${lat},${lng}`;
+        return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=${zoomLevel}&output=embed`;
     };
 
     const getMapStyle = () => {
         return {
-            filter: 'invert(85%) hue-rotate(180deg) brightness(1.1) contrast(95%) saturate(120%)',
+            filter: 'invert(90%) hue-rotate(180deg) brightness(1.05) contrast(90%) saturate(110%)',
             border: 0,
             opacity: 1
         };
@@ -56,14 +48,41 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
     const profile = business as EnrichedProfile;
     const isEnriched = !isDiscovering && business && 'phone' in business;
 
-    const TABS: { id: ActiveTab; label: string }[] = [
-        { id: 'profile', label: 'Profile' },
-        { id: 'theme', label: 'Theme' },
-        { id: 'contact', label: 'Contact' },
-        { id: 'social', label: 'Social' },
-        { id: 'menu', label: 'Menu' },
-        { id: 'competitors', label: 'Rivals' },
+    // Determine which tabs have actual data (hide empty tabs once enrichment is done)
+    const hasTheme = isDiscovering || !!(profile?.logoUrl || profile?.favicon);
+    const hasContact = isDiscovering || !!(profile?.phone || profile?.email || profile?.hours);
+    const hasSocial = isDiscovering || !!(
+        profile?.socialLinks?.instagram || profile?.socialLinks?.facebook ||
+        profile?.socialLinks?.twitter || profile?.socialLinks?.yelp ||
+        profile?.socialLinks?.tiktok || profile?.googleMapsUrl
+    );
+    const hasMenu = isDiscovering || !!(
+        profile?.menuUrl ||
+        profile?.socialLinks?.grubhub ||
+        profile?.socialLinks?.doordash ||
+        profile?.socialLinks?.ubereats ||
+        profile?.socialLinks?.seamless ||
+        profile?.socialLinks?.toasttab
+    );
+    const hasCompetitors = isDiscovering || !!(profile?.competitors?.length);
+
+    const ALL_TABS: { id: ActiveTab; label: string; hasData: boolean }[] = [
+        { id: 'profile', label: 'Profile', hasData: true },
+        { id: 'theme', label: 'Theme', hasData: hasTheme },
+        { id: 'contact', label: 'Contact', hasData: hasContact },
+        { id: 'social', label: 'Social', hasData: hasSocial },
+        { id: 'menu', label: 'Menu', hasData: hasMenu },
+        { id: 'competitors', label: 'Rivals', hasData: hasCompetitors },
     ];
+    const TABS = ALL_TABS.filter(t => t.hasData);
+
+    // Auto-select first available tab when enrichment completes
+    useEffect(() => {
+        if (!isDiscovering && TABS.length && !TABS.find(t => t.id === activeTab)) {
+            setActiveTab(TABS[0].id);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDiscovering]);
 
     return (
         <div className="relative w-full h-full bg-slate-800 overflow-hidden group">
@@ -75,6 +94,7 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                 src={getUrl()}
                 allowFullScreen
                 loading="lazy"
+                referrerPolicy="no-referrer"
                 title="Traffic Intelligence Map"
                 tabIndex={-1}
             ></iframe>
@@ -123,10 +143,7 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                                 <div>
                                     <h2 className="text-white font-bold text-lg leading-tight">{business.name}</h2>
                                     {isDiscovering ? (
-                                        <p className="text-amber-400 text-xs font-medium uppercase tracking-wider animate-pulse flex items-center gap-1 mt-0.5">
-                                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                            Running Sub-Agents...
-                                        </p>
+                                        <DiscoveryProgress phase="all" variant="inline" />
                                     ) : (
                                         <p className="text-indigo-300 text-xs font-medium uppercase tracking-wider flex items-center gap-1 mt-0.5">
                                             <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
@@ -173,7 +190,7 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                             {activeTab === 'theme' && (
                                 <div className="space-y-3 animate-fade-in relative min-h-[140px]">
                                     {isDiscovering ? (
-                                        <LoadingDots label="Parsing digital assets..." />
+                                        <DiscoveryProgress phase="theme" variant="dots" />
                                     ) : (
                                         <>
                                             {/* Logo preview */}
@@ -234,7 +251,7 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                             {activeTab === 'contact' && (
                                 <div className="space-y-3 animate-fade-in relative min-h-[100px]">
                                     {isDiscovering ? (
-                                        <LoadingDots label="Parsing digital assets..." />
+                                        <DiscoveryProgress phase="contact" variant="dots" />
                                     ) : (
                                         <>
                                             {profile.phone && (
@@ -269,7 +286,7 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                             {activeTab === 'social' && (
                                 <div className="space-y-3 animate-fade-in relative min-h-[100px]">
                                     {isDiscovering ? (
-                                        <LoadingDots label="Parsing digital assets..." />
+                                        <DiscoveryProgress phase="social" variant="dots" />
                                     ) : (
                                         <>
                                             <div className="flex flex-wrap gap-2">
@@ -291,6 +308,18 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                                                         Twitter / X
                                                     </a>
                                                 )}
+                                                {profile.socialLinks?.yelp && (
+                                                    <a href={profile.socialLinks.yelp} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors text-sm font-semibold" title="Yelp">
+                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.16 12.594l-4.995 1.433c-.96.275-1.638-.8-1.017-1.582l3.122-3.937c.602-.76 1.762-.404 1.84.546l.05 3.54zm-8.85 5.797l1.658 4.754c.36 1.03-.675 1.985-1.652 1.49L7.46 22.15c-.977-.496-1.017-1.844-.065-2.396l3.93-2.408c.91-.555 1.952.21 1.985 1.046zm-5.527-2.4c-.273.96-1.453 1.22-2.07.47L.928 12.55c-.617-.75-.235-1.882.702-2.095l4.898-1.117c.936-.213 1.73.787 1.312 1.65L5.784 15.99zm1.86-7.88L4.917 3.624c-.616-.75-.2-1.882.734-2.098l5.025-1.16c.934-.215 1.727.782 1.31 1.646L9.44 7.06c-.427.863-1.587.924-2.108.166l-.02-.026a1.18 1.18 0 01-.12-.49zm8.22.22c.078-.95 1.237-1.307 1.84-.547L21.6 12.1c.603.76.063 1.87-.895 1.75l-5.046-.62c-.958-.118-1.322-1.298-.596-1.945l1.792-1.764z" /></svg>
+                                                        Yelp
+                                                    </a>
+                                                )}
+                                                {profile.socialLinks?.tiktok && (
+                                                    <a href={profile.socialLinks.tiktok} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-700/30 text-slate-200 hover:bg-slate-700/50 border border-slate-600/30 transition-colors text-sm font-semibold" title="TikTok">
+                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.34 6.34 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.87a8.17 8.17 0 004.77 1.52V6.95a4.85 4.85 0 01-1-.26z" /></svg>
+                                                        TikTok
+                                                    </a>
+                                                )}
                                                 {profile.googleMapsUrl && (
                                                     <a href={profile.googleMapsUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors text-sm font-semibold">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -298,7 +327,7 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                                                     </a>
                                                 )}
                                             </div>
-                                            {!profile.socialLinks?.instagram && !profile.socialLinks?.facebook && !profile.socialLinks?.twitter && !profile.googleMapsUrl && (
+                                            {!profile.socialLinks?.instagram && !profile.socialLinks?.facebook && !profile.socialLinks?.twitter && !profile.socialLinks?.yelp && !profile.socialLinks?.tiktok && !profile.googleMapsUrl && (
                                                 <div className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-400 text-sm text-center">
                                                     No social profiles found.
                                                 </div>
@@ -308,32 +337,69 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                                 </div>
                             )}
 
-                            {/* MENU TAB: unchanged */}
+                            {/* MENU TAB: menu link + delivery platforms */}
                             {activeTab === 'menu' && (
-                                <div className="animate-fade-in relative min-h-[140px] flex flex-col items-center justify-center text-center">
+                                <div className="space-y-3 animate-fade-in relative min-h-[140px]">
                                     {isDiscovering ? (
-                                        <LoadingDots label="Parsing digital assets..." />
-                                    ) : profile.menuScreenshotBase64 && !menuImgError ? (
-                                        <div className="w-full">
-                                            <div className="h-32 rounded-xl overflow-hidden border border-white/10 mb-3 relative">
-                                                <img
-                                                    src={`data:image/jpeg;base64,${profile.menuScreenshotBase64}`}
-                                                    className="w-full h-full object-cover opacity-80"
-                                                    alt="Menu Snapshot"
-                                                    onError={() => setMenuImgError(true)}
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                                                <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
-                                                    <span className="text-xs font-bold text-white shadow-sm">Menu Loaded</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <DiscoveryProgress phase="menu" variant="dots" />
                                     ) : (
-                                        <div className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-400 text-sm text-center">
-                                            <svg className="w-6 h-6 text-slate-500 mb-2 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                            No explicit menu asset retained.
-                                        </div>
+                                        <>
+                                            {profile.menuUrl && (
+                                                <a
+                                                    href={profile.menuUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 border border-indigo-500/20 transition-colors font-semibold"
+                                                >
+                                                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                                    <span className="text-sm truncate">View Menu</span>
+                                                    <svg className="w-3 h-3 ml-auto shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                                </a>
+                                            )}
+                                            {(profile.socialLinks?.grubhub || profile.socialLinks?.doordash || profile.socialLinks?.ubereats || profile.socialLinks?.seamless || profile.socialLinks?.toasttab) && (
+                                                <>
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">Order Online</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {profile.socialLinks?.grubhub && (
+                                                            <a href={profile.socialLinks.grubhub} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20 transition-colors text-sm font-semibold">
+                                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+                                                                Grubhub
+                                                            </a>
+                                                        )}
+                                                        {profile.socialLinks?.doordash && (
+                                                            <a href={profile.socialLinks.doordash} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors text-sm font-semibold">
+                                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+                                                                DoorDash
+                                                            </a>
+                                                        )}
+                                                        {profile.socialLinks?.ubereats && (
+                                                            <a href={profile.socialLinks.ubereats} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors text-sm font-semibold">
+                                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 4a6 6 0 110 12A6 6 0 0112 6z"/></svg>
+                                                                Uber Eats
+                                                            </a>
+                                                        )}
+                                                        {profile.socialLinks?.seamless && (
+                                                            <a href={profile.socialLinks.seamless} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 border border-violet-500/20 transition-colors text-sm font-semibold">
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                                                                Seamless
+                                                            </a>
+                                                        )}
+                                                        {profile.socialLinks?.toasttab && (
+                                                            <a href={profile.socialLinks.toasttab} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 transition-colors text-sm font-semibold">
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                                                Toast
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
+                                            {!profile.menuUrl && !profile.socialLinks?.grubhub && !profile.socialLinks?.doordash && !profile.socialLinks?.ubereats && !profile.socialLinks?.seamless && !profile.socialLinks?.toasttab && (
+                                                <div className="w-full p-4 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-400 text-sm text-center">
+                                                    <svg className="w-6 h-6 text-slate-500 mb-2 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                                    No menu or ordering links found.
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -342,16 +408,18 @@ export default function MapVisualizer({ lat, lng, businessName, business, isDisc
                             {activeTab === 'competitors' && (
                                 <div className="space-y-3 animate-fade-in relative min-h-[140px]">
                                     {isDiscovering ? (
-                                        <LoadingDots label="Scanning geographic topology..." />
+                                        <DiscoveryProgress phase="competitors" variant="dots" />
                                     ) : profile.competitors?.length ? (
                                         <div className="space-y-2">
                                             {profile.competitors.map((comp, i) => (
-                                                <div key={i} className="flex flex-col gap-1 p-3 rounded-lg bg-black/30 border border-white/5 hover:border-indigo-500/30 transition-colors">
-                                                    <div className="flex justify-between items-start">
-                                                        <a href={comp.url} target="_blank" rel="noreferrer" className="text-sm font-bold text-indigo-300 hover:underline hover:decoration-indigo-500/50 truncate pr-4">
-                                                            {comp.name}
+                                                <div key={i} className="flex flex-col gap-1.5 p-3 rounded-lg bg-black/30 border border-white/5 hover:border-indigo-500/30 transition-colors">
+                                                    <span className="text-sm font-bold text-white leading-tight">{comp.name}</span>
+                                                    {comp.url && (
+                                                        <a href={comp.url} target="_blank" rel="noreferrer"
+                                                            className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline truncate">
+                                                            ↗ {comp.url.replace(/^https?:\/\/(www\.)?/, '')}
                                                         </a>
-                                                    </div>
+                                                    )}
                                                     {comp.reason && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{comp.reason}</p>}
                                                 </div>
                                             ))}

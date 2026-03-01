@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { SeoReport } from '@/lib/types';
+import { SeoReport } from '@/types/api';
 import RadialScore from './RadialScore';
 import RecommendationCard from './RecommendationCard';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -16,6 +16,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ report, groundingCh
   const displayReport = useMemo(() => {
     // Create a deep copy to avoid mutating props
     const newReport = JSON.parse(JSON.stringify(report)) as SeoReport;
+    // Guard against agents that return a report without a sections array
+    if (!Array.isArray(newReport.sections)) newReport.sections = [];
 
     // 1. Technical SEO: Core Web Vitals Check
     const techSection = newReport.sections.find(s =>
@@ -119,7 +121,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ report, groundingCh
 
     // Sections
     displayReport.sections.forEach(section => {
-      if (!section.isAnalyzed && section.recommendations.length === 0) return; // Skip empty non-analyzed sections in PDF
+      if (section.recommendations.length === 0) return; // Skip sections with no recommendations in PDF
 
       checkPageBreak(30);
 
@@ -297,33 +299,41 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ report, groundingCh
         </div>
       </div>
 
-      {/* Breakdown Chart */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-3 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-gray-800 mb-6">Score Breakdown</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                <XAxis type="number" domain={[0, 100]} hide />
-                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fill: '#64748b' }} />
-                <Tooltip
-                  cursor={{ fill: '#f1f5f9' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={32}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={getBarColor(entry.score)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* Breakdown Chart — only render when there are sections */}
+      {chartData.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-3 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <h3 className="text-lg font-bold text-gray-800 mb-6">Score Breakdown</h3>
+            <div className="h-64 w-full" style={{ minHeight: 200 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                  <XAxis type="number" domain={[0, 100]} hide />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <Tooltip
+                    cursor={{ fill: '#f1f5f9' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={32}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getBarColor(entry.score)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Detailed Sections */}
       <div className="space-y-4">
         <h3 className="text-xl font-bold text-gray-900 mb-4 px-1">Detailed Recommendations</h3>
+        {displayReport.sections.length === 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center">
+            <p className="text-gray-500 text-lg font-medium mb-2">No audit data available</p>
+            <p className="text-gray-400 text-sm">The SEO audit did not return detailed section data. Try running the audit again.</p>
+          </div>
+        )}
         {displayReport.sections.map((section, idx) => (
           <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <button
@@ -341,8 +351,8 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ report, groundingCh
                 <div className="text-left">
                   <h4 className="font-bold text-lg text-gray-900">{section.title}</h4>
                   <div className="flex gap-2">
-                    {section.isAnalyzed ? (
-                      <p className="text-sm text-gray-500">{section.recommendations.length} recommendations</p>
+                    {(section.isAnalyzed || section.recommendations.length > 0) ? (
+                      <p className="text-sm text-gray-500">{section.recommendations.length} recommendation{section.recommendations.length !== 1 ? 's' : ''}</p>
                     ) : (
                       <p className="text-sm text-gray-400 italic">Skipped deep dive</p>
                     )}
@@ -359,7 +369,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ report, groundingCh
             {expandedSection === section.title && (
               <div className="p-6 pt-0 bg-slate-50/50 border-t border-slate-100">
                 {/* Methodology / Logic Toggle */}
-                {section.isAnalyzed && section.methodology && (
+                {section.methodology && (
                   <div className="mb-6 mt-4">
                     <button
                       onClick={(e) => toggleMethodology(section.id, e)}
@@ -442,9 +452,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ report, groundingCh
                   ))}
                   {section.recommendations.length === 0 && (
                     <p className="text-gray-500 italic text-center py-4">
-                      {section.isAnalyzed
-                        ? "No critical issues found in this section. Great job!"
-                        : "Deep dive analysis was not selected for this category."}
+                      No critical issues found in this section. Great job!
                     </p>
                   )}
                 </div>

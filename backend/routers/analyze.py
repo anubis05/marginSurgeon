@@ -1,0 +1,356 @@
+"""POST /api/analyze — Full margin surgery pipeline."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import re
+import time
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+
+from backend.agents.margin_analyzer import (
+    vision_intake_agent,
+    benchmarker_agent,
+    commodity_watchdog_agent,
+    surgeon_agent,
+    advisor_agent,
+)
+from backend.agents.discovery import LocatorAgent
+from backend.agents.business_profiler import ProfilerAgent
+from backend.agents.marketing_swarm import generate_and_draft_marketing_content
+from backend.lib.report_storage import generate_slug, upload_report
+from backend.lib.report_templates import build_margin_report
+from backend.lib.db import write_agent_result
+from backend.config import AgentVersions
+from backend.lib.adk_helpers import user_msg, user_msg_with_image
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+def _clean_json(text: str) -> str:
+    return re.sub(r"```json\s*|\s*```", "", text).strip()
+
+
+async def _scrape_menu_screenshot(official_url: str) -> str | None:
+    """Scrape a full-page JPEG screenshot of the menu page."""
+    try:
+        from playwright.async_api import async_playwright
+
+        logger.info(f"[scrapeMenuScreenshot] Crawling {official_url}...")
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch()
+            context = await browser.new_context(
+                ignore_https_errors=True,
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                ),
+            )
+            page = await context.new_page()
+            await page.goto(official_url, wait_until="networkidle", timeout=15000)
+            await page.wait_for_timeout(2500)
+            buf = await page.screenshot(full_page=True, type="jpeg", quality=55)
+            await browser.close()
+
+        import base64
+
+        b64 = base64.b64encode(buf).decode()
+        logger.info(f"[scrapeMenuScreenshot] Screenshot captured ({len(buf) // 1024}KB)")
+        return b64
+    except Exception as exc:
+        logger.error(f"[scrapeMenuScreenshot] Failed: {exc}")
+        return None
+
+
+@router.post("/analyze")
+async def analyze(request: Request):
+    try:
+        body = await request.json()
+        url = body.get("url")
+        enriched_profile = body.get("enrichedProfile")
+        advanced_mode = body.get("advancedMode", False)
+
+        # FAST PATH: We already ran the Parallel Discovery Subagents
+        if enriched_profile and (
+            enriched_profile.get("menuUrl") or enriched_profile.get("menuScreenshotBase64")
+        ):
+            logger.info(f"[API/Analyze] Fast Path: Bypassing Profiler for {enriched_profile.get('name')}")
+            identity = {**enriched_profile}
+
+            # If discovery gave us a menuUrl but no screenshot, re-screenshot now
+            if not identity.get("menuScreenshotBase64") and identity.get("menuUrl"):
+                logger.info(f"[API/Analyze] Fast Path: Re-screenshotting menu page: {identity['menuUrl']}")
+                screenshot = await _scrape_menu_screenshot(identity["menuUrl"])
+                if screenshot:
+                    identity["menuScreenshotBase64"] = screenshot
+
+            # Ensure colors/persona are populated
+            identity.setdefault("primaryColor", "#0f172a")
+            identity.setdefault("secondaryColor", "#334155")
+            identity.setdefault("persona", "Local Business")
+
+        else:
+            # SLOW PATH: Legacy sequential flow
+            logger.info(f"[API/Analyze] Slow Path: Analyzing identity and crawling menu for: {url}")
+            base_identity = await LocatorAgent.resolve(url or "")
+            identity = await ProfilerAgent.profile(base_identity)
+
+        if not identity.get("menuScreenshotBase64"):
+            return JSONResponse(
+                {"error": "Failed to crawl menu from website. Please ensure the site has a visible 'Menu' link."},
+                status_code=422,
+            )
+
+        logger.info("[API/Analyze] Commencing explicit margin surgery via ADK Agents...")
+        session_service = InMemorySessionService()
+        session_id = f"surgery-{int(time.time() * 1000)}"
+        user_id = "hub-user"
+
+        await session_service.create_session(
+            app_name="hephae-hub", user_id=user_id, session_id=session_id, state={}
+        )
+
+        # 1. Vision Intake
+        logger.info("[API/Analyze] Step 1: Vision Intake...")
+        vision_runner = Runner(app_name="hephae-hub", agent=vision_intake_agent, session_service=session_service)
+
+        menu_items_prompt = ""
+        menu_items: list = []
+
+        b64_data = re.sub(r"^data:image/\w+;base64,", "", identity["menuScreenshotBase64"])
+
+        async for raw_event in vision_runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=user_msg_with_image("Extract all menu items from this image.", b64_data),
+        ):
+            event = raw_event
+            actions = getattr(event, "actions", None)
+            if actions:
+                delta = getattr(actions, "state_delta", None) or (actions if isinstance(actions, dict) else {})
+                if isinstance(delta, dict) and delta.get("parsedMenuItems"):
+                    val = delta["parsedMenuItems"]
+                    menu_items_prompt = val if isinstance(val, str) else json.dumps(val)
+
+        try:
+            logger.info(f"[API/Analyze] Raw Vision Output: {menu_items_prompt[:200]}")
+            menu_items_prompt = _clean_json(menu_items_prompt)
+            menu_items = json.loads(menu_items_prompt)
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("Vision parse failed")
+
+        if not menu_items:
+            return JSONResponse(
+                {"error": "Failed to parse menu items from crawled screenshot.", "rawOutput": menu_items_prompt},
+                status_code=422,
+            )
+
+        benchmark_prompt = "[]"
+        commodity_prompt = "[]"
+
+        if advanced_mode:
+            # 2. Benchmarker
+            logger.info("[API/Analyze] Step 2: Benchmarker (Advanced Mode)...")
+            benchmark_runner = Runner(app_name="hephae-hub", agent=benchmarker_agent, session_service=session_service)
+
+            async for raw_event in benchmark_runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=user_msg(
+                    f"Here are the parsed menu items for {identity.get('name')} "
+                    f"in {identity.get('address', 'their local area')}:\n{menu_items_prompt}"
+                ),
+            ):
+                event = raw_event
+                actions = getattr(event, "actions", None)
+                if actions:
+                    delta = getattr(actions, "state_delta", None) or (actions if isinstance(actions, dict) else {})
+                    if isinstance(delta, dict) and delta.get("competitorBenchmarks"):
+                        val = delta["competitorBenchmarks"]
+                        benchmark_prompt = val if isinstance(val, str) else json.dumps(val)
+
+            benchmark_prompt = _clean_json(benchmark_prompt)
+
+            # 3. Commodity Watchdog
+            logger.info("[API/Analyze] Step 3: Commodity Watchdog (Advanced Mode)...")
+            commodity_runner = Runner(
+                app_name="hephae-hub", agent=commodity_watchdog_agent, session_service=session_service
+            )
+
+            async for raw_event in commodity_runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=user_msg(f"Here are the parsed menu items:\n{menu_items_prompt}"),
+            ):
+                event = raw_event
+                actions = getattr(event, "actions", None)
+                if actions:
+                    delta = getattr(actions, "state_delta", None) or (actions if isinstance(actions, dict) else {})
+                    if isinstance(delta, dict) and delta.get("commodityTrends"):
+                        val = delta["commodityTrends"]
+                        commodity_prompt = val if isinstance(val, str) else json.dumps(val)
+
+            commodity_prompt = _clean_json(commodity_prompt)
+
+        else:
+            logger.info("[API/Analyze] Fast Mode: Bypassing Benchmarker and Watchdog LLMs.")
+            benchmark_prompt = json.dumps(
+                {
+                    "competitors": [
+                        {
+                            "competitor_name": "Local Average (Estimate)",
+                            "item_match": item.get("item_name", ""),
+                            "price": round((item.get("current_price", 0) or 0) * 1.05, 2),
+                            "source_url": "",
+                            "distance_miles": 1.0,
+                        }
+                        for item in menu_items
+                    ],
+                    "macroeconomic_context": {
+                        "analysis_hint": "Standard estimation mode enabled. Assume moderate inflation."
+                    },
+                }
+            )
+            commodity_prompt = json.dumps(
+                [
+                    {
+                        "ingredient": "GENERAL",
+                        "inflation_rate_12mo": 3.2,
+                        "trend_description": "Standard national food-at-home inflation estimate.",
+                    }
+                ]
+            )
+
+        # 4. Surgeon
+        logger.info("[API/Analyze] Step 4: The Surgeon...")
+        surgeon_runner = Runner(app_name="hephae-hub", agent=surgeon_agent, session_service=session_service)
+        surgeon_prompt = ""
+        menu_analysis: list = []
+
+        async for raw_event in surgeon_runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=user_msg(
+                f"Here are the arrays:\nMenuItems: {menu_items_prompt}\n"
+                f"Benchmarks: {benchmark_prompt}\nCommodities: {commodity_prompt}"
+            ),
+        ):
+            event = raw_event
+            content = getattr(event, "content", None)
+            if content and hasattr(content, "parts"):
+                for part in content.parts:
+                    fr = getattr(part, "function_response", None)
+                    if fr and getattr(fr, "name", None) == "perform_margin_surgery":
+                        menu_analysis = fr.response
+
+            actions = getattr(event, "actions", None)
+            if actions:
+                delta = getattr(actions, "state_delta", None) or (actions if isinstance(actions, dict) else {})
+                if isinstance(delta, dict) and delta.get("menuAnalysis") and not menu_analysis:
+                    val = delta["menuAnalysis"]
+                    surgeon_prompt = val if isinstance(val, str) else json.dumps(val)
+
+        if not menu_analysis and surgeon_prompt:
+            surgeon_prompt = _clean_json(surgeon_prompt)
+            try:
+                parsed = json.loads(surgeon_prompt)
+                if isinstance(parsed, list):
+                    menu_analysis = parsed
+                elif isinstance(parsed, dict):
+                    for key in parsed:
+                        if isinstance(parsed[key], list):
+                            menu_analysis = parsed[key]
+                            break
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.warning(f"Surgeon parse fail: {exc}")
+                logger.warning(f"Raw Surgeon Output: {surgeon_prompt[:300]}")
+
+        # 5. Advisor
+        logger.info("[API/Analyze] Step 5: The Advisor...")
+        advisor_runner = Runner(app_name="hephae-hub", agent=advisor_agent, session_service=session_service)
+        strategic_advice: list = []
+
+        async for raw_event in advisor_runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=user_msg(f"Here is the menuAnalysis from the Surgeon:\n{surgeon_prompt}"),
+        ):
+            event = raw_event
+            actions = getattr(event, "actions", None)
+            if actions:
+                delta = getattr(actions, "state_delta", None) or (actions if isinstance(actions, dict) else {})
+                if isinstance(delta, dict) and delta.get("strategicAdvice"):
+                    val = delta["strategicAdvice"]
+                    raw_adv = val if isinstance(val, str) else json.dumps(val)
+                    try:
+                        strategic_advice = json.loads(_clean_json(raw_adv))
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+
+        logger.info("[API/Analyze] ADK Margin Surgery Finished.")
+
+        # Score Calculation
+        total_leakage = sum(item.get("price_leakage", 0) for item in menu_analysis)
+        total_revenue = sum(item.get("current_price", 0) for item in menu_analysis)
+        score = max(0, min(100, round(100 - (total_leakage / (total_revenue or 1) * 20))))
+
+        report = {
+            "identity": identity,
+            "menu_items": menu_analysis,
+            "strategic_advice": strategic_advice,
+            "overall_score": score,
+            "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        }
+
+        # Fire and forget the marketing pipeline
+        asyncio.create_task(
+            generate_and_draft_marketing_content(report, "Margin Surgery")
+        )
+
+        slug = generate_slug(identity.get("name", "unknown"))
+
+        # Upload HTML report to GCS
+        report_url = await upload_report(
+            slug=slug,
+            report_type="margin",
+            html_content=build_margin_report(report),
+            identity=identity,
+            summary=f"${total_leakage:,.0f} profit leakage detected. Score: {score}/100",
+        )
+
+        # Strip binary blobs before writing to DB
+        safe_identity = {k: v for k, v in identity.items() if k != "menuScreenshotBase64"}
+        safe_report = {**report, "identity": safe_identity}
+
+        asyncio.create_task(
+            write_agent_result(
+                business_slug=slug,
+                business_name=identity.get("name", "unknown"),
+                agent_name="margin_surgeon",
+                agent_version=AgentVersions.MARGIN_SURGEON,
+                triggered_by="user",
+                score=score,
+                summary=f"${total_leakage:,.0f} profit leakage. Score: {score}/100",
+                report_url=report_url or None,
+                kpis={"totalLeakage": total_leakage},
+                raw_data=safe_report,
+            )
+        )
+
+        result = {**report}
+        if report_url:
+            result["reportUrl"] = report_url
+
+        return JSONResponse(result)
+
+    except Exception as exc:
+        logger.error(f"[API/Analyze] Orchestration Failed: {exc}")
+        return JSONResponse({"error": "Internal Server Error"}, status_code=500)

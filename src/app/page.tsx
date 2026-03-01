@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Search as SearchIcon, MapPin, Building2, Store, Loader2, ArrowRight, Activity, Percent, DollarSign, TrendingUp, AlertTriangle, Scale, Target, Swords, X, Download, BarChart3, Users, Search, Share2 } from 'lucide-react';
-import { SurgicalReport } from '@/lib/types';
+import { SurgicalReport } from '@/types/api';
 import clsx from 'clsx';
 import ChatInterface from '@/components/Chatbot/ChatInterface';
 import HephaeLogo from '@/components/HephaeLogo';
@@ -11,13 +11,13 @@ import DetailPanel from '@/components/Chatbot/DetailPanel';
 import MapVisualizer from '@/components/Chatbot/MapVisualizer';
 import HeatmapGrid from '@/components/Chatbot/HeatmapGrid';
 import { ChatMessage, ForecastResponse } from '@/components/Chatbot/types';
-import { BaseIdentity } from '@/agents/types';
+import { BaseIdentity } from '@/types/api';
 import { NeuralBackground } from '@/components/Chatbot/NeuralBackground';
 import BlobBackground from '@/components/BlobBackground';
 import { EmailWall } from '@/components/Chatbot/EmailWall';
 import ResultsDashboard from '@/components/Chatbot/seo/ResultsDashboard';
 import DiscoveryProgress, { ALL_DISCOVERY_MESSAGES, useRotatingMessage } from '@/components/Chatbot/DiscoveryProgress';
-import { SeoReport } from '@/lib/types';
+import { SeoReport } from '@/types/api';
 
 const LOADING_QUOTES = [
   // Data-driven
@@ -42,7 +42,7 @@ const LOADING_QUOTES = [
 
 export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'model', text: 'Hi! I am Hephae.\nSearch for your restaurant to get started.' }
+    { id: '1', role: 'model', text: 'Hi! I am Hephae.\nSearch for your business to get started.' }
   ]);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -173,7 +173,7 @@ export default function Home() {
             address: locatedBusiness?.address,
             seoReport: seoReport ? { overallScore: seoReport.overallScore, sections: seoReport.sections?.map((s: any) => ({ name: s.name, score: s.score, recommendations: s.recommendations })), summary: seoReport.summary } : undefined,
             marginReport: report ? { overall_score: report.overall_score, menu_items: report.menu_items?.slice(0, 10), strategic_advice: report.strategic_advice } : undefined,
-            trafficForecast: forecast ? { summary: forecast.summary, daily: forecast.daily?.slice(0, 5) } : undefined,
+            trafficForecast: forecast ? { summary: forecast.summary, forecast: forecast.forecast?.slice(0, 5) } : undefined,
             competitiveReport: competitiveReport ? { market_summary: competitiveReport.market_summary, competitors: competitiveReport.competitors, recommendations: competitiveReport.recommendations } : undefined,
           }
         })
@@ -225,29 +225,25 @@ export default function Home() {
           sendReportEmailAsync('profile', enrichedProfile.reportUrl, enrichedProfile.name || identity.name, `Business profile for ${enrichedProfile.name || identity.name} has been compiled.`);
         }
         setLocatedBusiness(enrichedProfile); // Update to enriched profile
-        setCapabilities([
-          { id: 'surgery', label: 'Analyze Menu Margins' },
-          { id: 'traffic', label: 'Forecast Foot Traffic' },
-          { id: 'seo', label: 'Run SEO Deep Audit' },
-          { id: 'competitive', label: 'Run Competitive Analysis' }
-        ]);
         // Add a discovery-complete message to chat
         setMessages(prev => [...prev, {
           id: `discovery-done-${Date.now()}`,
           role: 'model',
           text: `Discovery complete for **${enrichedProfile.name || identity.name}**! I've mapped out their digital presence, brand identity, social profiles, and competitive landscape. Pick any capability below to dive deeper.`
         }]);
+      } else {
+        console.error("Discovery returned", res.status);
       }
     } catch (e) {
       console.error("Discovery failed", e);
-      // Fallback: unlock capabilities anyway
+    } finally {
+      // Always unlock capabilities — even if discovery failed, users can still run analyses
       setCapabilities([
         { id: 'surgery', label: 'Analyze Menu Margins' },
         { id: 'traffic', label: 'Forecast Foot Traffic' },
         { id: 'seo', label: 'Run SEO Deep Audit' },
         { id: 'competitive', label: 'Run Competitive Analysis' }
       ]);
-    } finally {
       setIsDiscovering(false);
     }
   };
@@ -344,8 +340,9 @@ export default function Home() {
         });
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Analysis Failed");
+          let errMsg = "Analysis Failed";
+          try { const err = await res.json(); errMsg = err.error || errMsg; } catch { errMsg = `Server error (${res.status})`; }
+          throw new Error(errMsg);
         }
 
         const data = await res.json();
@@ -376,8 +373,9 @@ export default function Home() {
         });
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Analysis Failed");
+          let errMsg = "Analysis Failed";
+          try { const err = await res.json(); errMsg = err.error || errMsg; } catch { errMsg = `Server error (${res.status})`; }
+          throw new Error(errMsg);
         }
 
         const data = await res.json();
@@ -414,8 +412,9 @@ export default function Home() {
         });
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Analysis Failed");
+          let errMsg = "Analysis Failed";
+          try { const err = await res.json(); errMsg = err.error || errMsg; } catch { errMsg = `Server error (${res.status})`; }
+          throw new Error(errMsg);
         }
 
         const data = await res.json();
@@ -465,8 +464,9 @@ export default function Home() {
         });
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Analysis Failed");
+          let errMsg = "Analysis Failed";
+          try { const err = await res.json(); errMsg = err.error || errMsg; } catch { errMsg = `Server error (${res.status})`; }
+          throw new Error(errMsg);
         }
 
         const data = await res.json();
@@ -761,13 +761,13 @@ export default function Home() {
   return (
     <main className={`flex h-screen w-screen overflow-hidden relative transition-colors duration-700 ${isCentered ? 'bg-white' : 'bg-gray-50'}`}>
 
-      {/* BACKGROUND ANIMATION */}
+      {/* BACKGROUND ANIMATION — blob at z-0 (decorative), neural canvas at z-10 (interactive) */}
       {isCentered && (
         <>
-          <div className="absolute inset-0 z-0 opacity-70">
+          <BlobBackground className="z-0 opacity-70" />
+          <div className="absolute inset-0 z-10 opacity-70">
             <NeuralBackground />
           </div>
-          <BlobBackground className="z-0 opacity-70" />
         </>
       )}
 
@@ -989,7 +989,8 @@ export default function Home() {
       </div>
 
       {/* RIGHT CHATBOT PANEL - Full screen when centered, narrow sidebar when active */}
-      <div className={`relative z-20 flex-shrink-0 transition-all duration-700 ease-in-out h-full ${isCentered ? 'w-full max-w-none' : 'w-[480px]'}`}>
+      {/* When centered: pointer-events-none on wrapper so neural background is interactive; children re-enable pointer-events-auto on inputs/buttons */}
+      <div className={`relative z-20 flex-shrink-0 transition-all duration-700 ease-in-out h-full ${isCentered ? 'w-full max-w-none pointer-events-none' : 'w-[480px]'}`}>
         <ChatInterface
           messages={messages}
           onSendMessage={sendMessage}
@@ -997,7 +998,7 @@ export default function Home() {
           isTyping={isTyping}
           isDiscovering={isDiscovering}
           onReset={() => {
-            setMessages([{ id: '1', role: 'model', text: 'Hi! I am Hephae. Type the name of a business you want to analyze or just ask me anything.' }]);
+            setMessages([{ id: '1', role: 'model', text: 'Hi! I am Hephae.\nSearch for your business to get started.' }]);
             setLocatedBusiness(null);
             setReport(null);
             setForecast(null);
